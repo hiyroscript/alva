@@ -394,17 +394,21 @@ export function fighterParts(f, x = f.renderX, y = f.renderY) {
 }
 
 // The fighter standing idle, `time` seconds into its idle clip, as the art
-// a menu draws round its origin: [{ frame, dx, dy }] (dx, dy in art pixels,
-// facing right), back to front. One part for an ordinary fighter; one per
-// member for an ensemble, each at its home on its own idle clip.
+// a menu draws round its origin: [{ frame, dx, dy, source }] (dx, dy in art
+// pixels, facing right; `source` the way the idle clip's own art faces, 1
+// or -1, its sourceFacing else the character's: drawn facing `facing`, a
+// part is mirrored when the two differ), back to front. One part for an
+// ordinary fighter; one per member for an ensemble, each at its home on its
+// own idle clip.
 export function idlePose(sprites, time) {
   const at = (set) => {
     const idle = set?.animations.idle;
     return idle ? idle.frames[Math.floor(time * idle.fps + 1e-9) % idle.frames.length] : null;
   };
+  const source = (set) => set?.animations.idle?.sourceFacing ?? set?.def?.sourceFacing ?? 1;
   const parts = sprites?.members
-    ? sprites.members.map((m) => ({ frame: at(m.set), dx: m.home.x, dy: m.home.y }))
-    : [{ frame: at(sprites), dx: 0, dy: 0 }];
+    ? sprites.members.map((m) => ({ frame: at(m.set), dx: m.home.x, dy: m.home.y, source: source(m.set) }))
+    : [{ frame: at(sprites), dx: 0, dy: 0, source: source(sprites) }];
   return parts.filter((p) => p.frame);
 }
 

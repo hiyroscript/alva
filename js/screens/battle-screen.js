@@ -49,12 +49,13 @@
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
-import { el } from '../core/utils.js';
+import { el, deriveSeed } from '../core/utils.js';
 import { t, tx, tattr, setText, setAttr, joinList, slotLabel } from '../localization/i18n.js';
 import { menuButton, dialogControls } from '../ui/components.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
-import { Battle, BATTLE_MODES } from '../game/battle.js';
+import { Battle, BATTLE_MODES, PHASES } from '../game/battle.js';
+import { MatchEntranceArt } from '../game/rendering/match-entrance.js';
 import { BattleAudio } from '../core/audio/battle-audio.js';
 import { STAT_KEYS } from '../game/match-stats.js';
 import { HUD } from '../ui/hud.js';
@@ -94,6 +95,14 @@ const OVERTIME_BANNER_SECONDS = 1.4;
 // How long the final announcement shows once the match is decided (seconds
 // of the celebration's clock).
 export const FINAL_BANNER_SECONDS = 2.4;
+
+// How long the HUD, the move HUDs and the touch controls take to fade in
+// as the entrance hands over to the intro (seconds; the stylesheet's
+// .is-hud-arriving animation is as long).
+export const HUD_ARRIVAL_SECONDS = 0.4;
+
+// The bolt's own stream of the battle's seed, each match its own draw.
+const BOLT_STREAM = 0x626f6c74;
 
 // The toast's line for each outcome (Local Play's names the player).
 const TOAST_TEXT = { p1: 'toast.p1Wins', p2: 'toast.p2Wins', draw: 'toast.draw' };
@@ -196,13 +205,27 @@ export class BattleScreen extends Screen {
     this.banner = el('div', { class: 'battle-banner', 'aria-live': 'assertive' }, [this.bannerSub, this.bannerMain]);
     this.bannerState = null;
 
+    // The match entrance's versus screen and its cover (js/game/entrance.js,
+    // drawn by js/game/rendering/match-entrance.js): over the battle canvas
+    // and everything of the match, under the pause menu and the Match
+    // Results. While it is up the HUD, the move HUDs, the touch controls and
+    // the Screen Pad hint are hidden and play is off (`is-entrance`); they
+    // fade back in as the intro starts.
+    this.entranceCanvas = el('canvas', { class: 'entrance-canvas', 'aria-hidden': 'true', hidden: true });
+    this.entranceArt = new MatchEntranceArt(this.entranceCanvas);
+    // Where the entrance's canvas waits over the loading overlay while the
+    // bolt strikes over its last look (see startEntrance), or null.
+    this.entranceHost = null;
+    this.entranceShown = false;
+    this.hudArrival = 0;
+
     this.buildPause();
     this.buildToast();
     this.buildResults();
 
     this.el.replaceChildren(
       this.canvas, this.hudRoot, this.abilityRoot, this.abilityRoot2, this.touchRoot, this.padHint.root, this.banner, this.toast,
-      this.pauseOverlay, this.resultsOverlay,
+      this.entranceCanvas, this.pauseOverlay, this.resultsOverlay,
     );
 
     this.battle = null;
@@ -518,12 +541,19 @@ export class BattleScreen extends Screen {
       });
       return;
     }
-    app.loading.hide();
+    // The bolt strikes over the loading overlay's last look when it shows
+    // (startEntrance hides it once the black covers it); otherwise it goes.
+    const loadingShown = this.loadingShown;
+    if (!loadingShown) app.loading.hide();
 
     this.battle = new Battle({
       canvas: this.canvas,
       map,
       mode: battleModeOf(mode),
+      // Every match starts with its entrance (js/game/entrance.js); the
+      // screen hands over as it ends (onBattlePhase).
+      entrance: true,
+      onPhase: (phase) => this.onBattlePhase(phase),
       p1Def,
       p2Def,
       p1Sprites: sprites.get(p1Def.id),
@@ -554,6 +584,7 @@ export class BattleScreen extends Screen {
     document.addEventListener('visibilitychange', this.onVisibility);
     if (local) this.unsubControllers = app.controllers?.onChange?.(() => this.syncControllers()) ?? null;
     document.activeElement?.blur?.();
+    this.startEntrance({ over: loadingShown ? app.loading.root : null });
     this.setPlayActive(true);
     this.syncAbilityHud();
     this.el.classList.add('is-live');
@@ -603,8 +634,10 @@ export class BattleScreen extends Screen {
   // Watch Mode nobody controls a fighter, so they stay off throughout. The
   // touch controls play nobody in Local Play either. Pause keys, gamepad
   // Start and the menus never depend on them.
+  // Off throughout the match's entrance: they come on as its intro starts
+  // (endEntrance), as they always did at a match's start.
   setPlayActive(on) {
-    const playing = on && this.mode !== 'watch';
+    const playing = on && this.mode !== 'watch' && !this.entranceRunning;
     this.app.input.setGameplayActive(playing);
     this.touch.setEnabled(playing && this.mode !== 'local');
     this.padHint.sync(playing && this.mode !== 'local', this.touch.scheme);
@@ -612,6 +645,7 @@ export class BattleScreen extends Screen {
 
   exit() {
     this.token = null;
+    this.endEntrance();
     this.unsubKey?.();
     this.unsubKey = null;
     this.unsubControllers?.();
@@ -671,9 +705,13 @@ export class BattleScreen extends Screen {
       // A new size or orientation moves the touch controls with the screen.
       this.touch.applyLayout();
       if (battle.resize() && !this.isRunning) battle.render();
+      // The entrance lays itself out again for the new size, where it is.
+      if (this.entranceShown && this.entranceArt.layout()) this.drawEntrance();
     }
+    this.arriveHud(dt);
     if (!this.isRunning || this.holdsForPortrait) return;
     battle.frame(dt);
+    this.drawEntrance();
     this.sound.sync();
     const own = this.playerFighter;
     this.touch.setAirborne(!!own && !own.grounded);
@@ -750,6 +788,114 @@ export class BattleScreen extends Screen {
     this.pause();
   }
 
+  // ---- The match's entrance (js/game/entrance.js) -------------------------------------
+
+  // Whether the loading overlay is on show (the bolt then strikes over it).
+  get loadingShown() {
+    const root = this.app.loading?.root;
+    return !!root && !root.hidden;
+  }
+
+  // Whether the battle is in its entrance.
+  get entranceRunning() {
+    return this.battle?.phase === PHASES.entrance;
+  }
+
+  // Each side as the versus screen shows it: its fighter's sprites, its
+  // side's name (Team I and Team II, Local Play's Player 1 and Player 2)
+  // and its fighter's.
+  entranceSides() {
+    const battle = this.battle;
+    return Object.fromEntries(SLOTS.map((slot) => [slot, {
+      sprites: battle[slot].sprites, side: this.entranceSideName(slot), name: battle[slot].def.displayName,
+    }]));
+  }
+
+  entranceSideName(slot) {
+    return t(this.mode === 'local' ? PLAYER_NAMES[slot] : `team.${slot}`);
+  }
+
+  // A match begins (entered, restarted or rematched): its entrance over
+  // whatever the player sees now. With `over` (the loading overlay, when it
+  // shows) the entrance's canvas is laid over it, so the bolt strikes over
+  // its last look and the black fades in over it; once the black is whole
+  // the canvas comes back to this screen and the overlay goes (see
+  // settleEntrance). The HUD and every control hide at once.
+  startEntrance({ over = null } = {}) {
+    const battle = this.battle;
+    if (!battle?.entrance) return;
+    this.hudArrival = 0;
+    this.el.classList.remove('is-hud-arriving');
+    this.el.classList.add('is-entrance');
+    this.entranceShown = true;
+    this.entranceCanvas.hidden = false;
+    if (over && this.entranceCanvas.parentNode !== over) {
+      this.entranceHost = over;
+      over.append(this.entranceCanvas);
+    }
+    this.entranceArt.begin({
+      timeline: battle.entrance,
+      seed: deriveSeed(battle.seed >>> 0, BOLT_STREAM + battle.matchIndex),
+      sides: this.entranceSides(),
+      reducedMotion: !!this.app.device?.reducedMotion,
+    });
+  }
+
+  // The entrance's frame now: its canvas over the loading overlay comes
+  // home once the black is whole; it clears and hides once the cover has
+  // cleared (the intro starting hands over: onBattlePhase).
+  drawEntrance() {
+    if (!this.entranceShown) return;
+    const battle = this.battle;
+    const t = battle?.entranceTime ?? null;
+    if (this.entranceHost && (t === null || t >= battle.entrance.blackEnd)) this.settleEntrance();
+    // Once the cover has cleared it hides (the next match's begin() clears
+    // it: a canvas laid out again starts empty).
+    if (this.entranceArt.showing(t)) this.entranceArt.draw(t);
+    else this.entranceCanvas.hidden = true;
+  }
+
+  // The Battle's phase changed (inside its step): leaving the entrance (its
+  // end, or any phase set over it), the screen hands over at once.
+  onBattlePhase(phase) {
+    if (phase !== PHASES.entrance && this.entranceShown) this.endEntrance({ arrive: true });
+  }
+
+  // The entrance's canvas back on this screen, under the pause menu, and
+  // the loading overlay gone (it lay over the loading overlay through the
+  // strike: see startEntrance). Pausing does it at once.
+  settleEntrance() {
+    if (!this.entranceHost) return;
+    this.entranceHost = null;
+    this.el.insertBefore?.(this.entranceCanvas, this.pauseOverlay) ?? this.el.append(this.entranceCanvas);
+    this.app.loading.hide();
+  }
+
+  // The entrance is over (the intro starts), or left: its canvas hidden,
+  // and, as the intro starts (`arrive`), the HUD, the move HUDs and the
+  // touch controls fade back in and play comes on as it always did at a
+  // match's start (unless a menu is open over it: the pause menu, the
+  // Match Results, Online Play's match menu).
+  endEntrance({ arrive = false } = {}) {
+    this.settleEntrance();
+    if (!this.entranceShown) return;
+    this.entranceShown = false;
+    this.entranceCanvas.hidden = true;
+    this.el.classList.remove('is-entrance');
+    if (!arrive) return;
+    this.el.classList.add('is-hud-arriving');
+    this.hudArrival = HUD_ARRIVAL_SECONDS;
+    this.setPlayActive(!this.paused && !this.resultsOpen && !this.menuOpen);
+    this.syncAbilityHud();
+  }
+
+  // The HUD's fade-in runs its course (on the screen's own clock, no timer).
+  arriveHud(dt) {
+    if (this.hudArrival <= 0) return;
+    this.hudArrival -= dt;
+    if (this.hudArrival <= 0) this.el.classList.remove('is-hud-arriving');
+  }
+
   // ---- Banner -------------------------------------------------------------------
 
   updateBanner() {
@@ -801,6 +947,9 @@ export class BattleScreen extends Screen {
 
   pause() {
     if (!this.battle || this.paused) return;
+    // The pause menu shows over the entrance, never under the loading
+    // overlay.
+    this.settleEntrance();
     this.paused = true;
     this.sound.setPaused(true);
     this.setPlayActive(false);
@@ -915,6 +1064,7 @@ export class BattleScreen extends Screen {
   restart() {
     if (!this.battle) return;
     this.battle.restart();
+    this.startEntrance();
     this.touch.setAirborne(!!this.playerFighter && !this.playerFighter.grounded);
     this.touch.showStatus(this.playerFighter);
     this.hud.update(this.battle);
@@ -1131,6 +1281,7 @@ export class BattleScreen extends Screen {
     if (!this.battle) return;
     this.hideFinal();
     this.battle.restart();
+    this.startEntrance();
     this.touch.setAirborne(!!this.playerFighter && !this.playerFighter.grounded);
     this.touch.showStatus(this.playerFighter);
     this.hud.update(this.battle);

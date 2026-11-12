@@ -1,13 +1,24 @@
 // The sound effects (the Sound update): the three ejections, the Deflect,
-// the Perfect Shield, the Shield block and the Shield held. Synthesized
+// the Perfect Shield, the Shield block and the Shield held; and the four
+// the owner added with the match entrance (js/game/entrance.js): a
+// fighter's spawn, the bolt's strike, the bolt covering the screen and the
+// cover clearing to the stage. Synthesized
 // live on Web Audio, each a small graph started on the audio clock and gone
 // once it has sounded: a tight transient, a weighty low end, a bright,
 // crisp top and a short sparkle or tail. Each play varies its pitch and
 // level by a few per cent (`vary`), so no two repeats sound alike.
 //
-// Every recipe: (ctx, out, t, { pitch, level, pan, direction, reverb },
-// bank) => end time. `out` is the effects bus; `reverb` the effects'
-// shared reverb send.
+// Every recipe: (ctx, out, t, { pitch, level, pan, direction, reverb,
+// root }, bank) => end time. `out` is the effects bus; `reverb` the
+// effects' shared reverb send; `root` a pitch (Hz) a recipe may resolve
+// onto (the reveal: the stage's tonic).
+//
+// The entrance's family sits on A and E: the strike hums on A, the cover's
+// roar rises a fifth from A to E at full cover, and the reveal leaves that
+// E for the stage's own tonic, so the three lead one into the next and the
+// last into the stage's music. The spawn shimmers on A and E too (an open
+// fifth, no third, neither bright nor dark news), as the ejections' and the
+// Shield's sounds keep to their own fixed pitches.
 
 function node(ctx, type, opts = {}) {
   let n;
@@ -135,6 +146,63 @@ function brassHit(ctx, out, t, { freqs, level, decay = 0.35, bright = 4200 }) {
 }
 
 const max = (...ends) => Math.max(...ends);
+
+// An electric hum: detuned saws on `freqs` through a low-pass that
+// flutters (`flutter` Hz), in over `a`, dying away with time constant
+// `decay`.
+function hum(ctx, out, t, { freqs, level, decay, a = 0.03, cutoff = 620, flutter = 9 }) {
+  const lp = node(ctx, 'filter', { freq: cutoff, q: 1.4, t });
+  const lfo = node(ctx, 'osc', { freq: flutter, t });
+  const depth = node(ctx, 'gain', { value: cutoff * 0.4 });
+  lfo.connect(depth).connect(lp.frequency);
+  const g = node(ctx, 'gain', { value: 0 });
+  const end = hit(g.gain, t, level, a, decay);
+  const oscs = [lfo];
+  for (const f of freqs) for (const c of [-7, 7]) {
+    const o = node(ctx, 'osc', { wave: 'sawtooth', freq: f, t });
+    o.detune.setValueAtTime(c, t);
+    o.connect(lp);
+    oscs.push(o);
+  }
+  lp.connect(g).connect(out);
+  for (const o of oscs) {
+    o.start(t);
+    o.stop(end);
+  }
+  return end;
+}
+
+// A noise swell: rising to `level` over `rise` seconds (a filter sweeping
+// from `from` to `to` Hz meanwhile), then gone with time constant `decay`.
+function swell(ctx, out, t, bank, { kind = 'lowpass', from, to, q = 0.8, rise, level, decay, pan = 0 }) {
+  const src = noiseSource(ctx, bank, t);
+  const f = node(ctx, 'filter', { kind, freq: from, q, t });
+  f.frequency.exponentialRampToValueAtTime(to, t + rise);
+  const g = node(ctx, 'gain', { value: 0 });
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(level, t + rise);
+  g.gain.setTargetAtTime(0, t + rise, decay);
+  const end = t + rise + decay * 7;
+  const p = node(ctx, 'pan', { pan, t });
+  src.connect(f).connect(g).connect(p).connect(out);
+  src.start(t, src.loopStart);
+  src.stop(end);
+  return end;
+}
+
+// An electric crackle: a few tiny noise snaps at `times` (seconds after
+// t), each fainter.
+function crackle(ctx, out, t, bank, { times, level, freq = 4200 }) {
+  let end = t;
+  times.forEach((dt, i) => {
+    end = Math.max(end, burst(ctx, out, t + dt, bank, { kind: 'highpass', freq: freq * (0.9 + 0.2 * Math.random()), level: level * 0.8 ** i, d: 0.004 }));
+  });
+  return end;
+}
+
+// The family's two pitches (see the top): A2 and E3.
+const BOLT_A = 110;
+const BOLT_E = 164.81;
 
 // Each recipe's channel: its level, pan, and a send to the effects' reverb.
 function strip(ctx, out, reverb, t, { level = 1, pan = 0, send = 0.25 }) {
@@ -283,6 +351,100 @@ export const SFX_RECIPES = Object.freeze({
       be,
       boom(ctx, s.input, t, { from: 190 * k, to: 85 * k, bend: 0.025, decay: 0.05, level: 0.75, lowpass: 900 }),
       burst(ctx, s.input, t, bank, { freq: 750 * k, q: 0.9, level: 0.3, d: 0.022 }),
+    );
+  },
+
+  // A fighter spawns or respawns, on the pop of its burst (the burst played
+  // backwards closing in): a bright, punchy pop with a soft low thump at
+  // once, then the "materialize" shimmer rising a fifth into place and a
+  // sparkly tail settling, about 0.4 s. Its pitch barely moves (a quarter
+  // of the usual variation), the same for every fighter; it sits under the
+  // music and the ejections.
+  'sfx.spawn'(ctx, out, t, o, bank) {
+    const k = 1 + (o.pitch - 1) * 0.25;
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 0.9, pan: o.pan * 0.5, send: 0.3 });
+    return max(
+      burst(ctx, s.input, t, bank, { kind: 'highpass', freq: 4200, level: 0.32, d: 0.006 }),
+      boom(ctx, s.input, t, { from: 300 * k, to: 140 * k, bend: 0.015, decay: 0.04, level: 0.42 }),
+      boom(ctx, s.input, t, { from: 120 * k, to: 52 * k, bend: 0.05, decay: 0.09, level: 0.36, lowpass: 320 }),
+      ring(ctx, s.input, t + 0.01, {
+        freq: 880 * k, level: 0.05, rise: 7, riseTime: 0.3, shimmer: 14, a: 0.12,
+        partials: [[1, 1, 0.16], [1.5, 0.75, 0.14], [2, 0.5, 0.12], [3, 0.25, 0.08]],
+      }),
+      swell(ctx, s.input, t, bank, { kind: 'bandpass', from: 2400, to: 7000, q: 1.2, rise: 0.22, level: 0.07, decay: 0.05 }),
+      ring(ctx, s.input, t + 0.24, {
+        freq: 1760 * k, level: 0.04, a: 0.004,
+        partials: [[1, 1, 0.22], [1.5, 0.6, 0.18], [2.76, 0.4, 0.12], [5.4, 0.25, 0.08]],
+      }),
+    );
+  },
+
+  // The entrance's bolt striking (its contact): a sharp electric crack,
+  // a few snaps of crackle and a short sizzle, a low thud under it, then a
+  // quiet electric hum on A under the bolt's flicker, gone by the time the
+  // black has faded in. A little louder than the hits, under the
+  // ejections.
+  'sfx.boltStrike'(ctx, out, t, o, bank) {
+    const k = o.pitch;
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 1.9, pan: 0, send: 0.34 });
+    return max(
+      burst(ctx, s.input, t, bank, { kind: 'highpass', freq: 3000, level: 0.5, d: 0.01 }),
+      burst(ctx, s.input, t + 0.002, bank, { freq: 1900 * k, q: 0.9, level: 0.26, d: 0.03 }),
+      boom(ctx, s.input, t, { from: 320 * k, to: 55 * k, bend: 0.03, decay: 0.09, level: 0.5 }),
+      crackle(ctx, s.input, t + 0.012, bank, { times: [0, 0.019, 0.041, 0.07, 0.11], level: 0.16 }),
+      burst(ctx, s.input, t + 0.01, bank, { freq: 5200, q: 1.4, to: 2600, sweep: 0.3, level: 0.14, a: 0.01, d: 0.09 }),
+      hum(ctx, s.input, t + 0.03, { freqs: [BOLT_A * k, BOLT_E * k], level: 0.055, decay: 0.11, a: 0.05 }),
+    );
+  },
+
+  // The bolt striking again and covering the screen: a bigger, brighter
+  // crack, and a roar of noise swelling open with the glow's bloom while a
+  // low line rises a fifth, A to E, peaking at full cover (`cover`
+  // seconds in, the entrance's coverLength), then letting go.
+  'sfx.boltCover'(ctx, out, t, o, bank) {
+    const k = o.pitch;
+    const cover = 0.28;
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 1.85, pan: 0, send: 0.42 });
+    const rise = node(ctx, 'osc', { wave: 'sawtooth', freq: BOLT_A * k, t });
+    rise.frequency.exponentialRampToValueAtTime(BOLT_E * k, t + cover);
+    const riseLp = node(ctx, 'filter', { freq: 400, q: 2, t });
+    riseLp.frequency.exponentialRampToValueAtTime(2200, t + cover);
+    const riseGain = node(ctx, 'gain', { value: 0 });
+    riseGain.gain.setValueAtTime(0, t);
+    riseGain.gain.linearRampToValueAtTime(0.11, t + cover);
+    riseGain.gain.setTargetAtTime(0, t + cover, 0.14);
+    const riseEnd = t + cover + 1;
+    rise.connect(riseLp).connect(riseGain).connect(s.input);
+    rise.start(t);
+    rise.stop(riseEnd);
+    return max(
+      riseEnd,
+      burst(ctx, s.input, t, bank, { kind: 'highpass', freq: 2600, level: 0.55, d: 0.012 }),
+      boom(ctx, s.input, t, { from: 260 * k, to: 45 * k, bend: 0.04, decay: 0.14, level: 0.52 }),
+      crackle(ctx, s.input, t + 0.01, bank, { times: [0, 0.023, 0.05, 0.09], level: 0.18, freq: 3600 }),
+      swell(ctx, s.input, t, bank, { from: 380, to: 5200, rise: cover, level: 0.3, decay: 0.12, pan: -0.3 }),
+      swell(ctx, s.input, t, bank, { from: 420, to: 5600, rise: cover, level: 0.3, decay: 0.12, pan: 0.3 }),
+      ring(ctx, s.input, t + 0.02, {
+        freq: BOLT_E * 4 * k, level: 0.045, a: cover - 0.02, shimmer: 12,
+        partials: [[1, 1, 0.14], [1.5, 0.6, 0.12], [2, 0.45, 0.1]],
+      }),
+    );
+  },
+
+  // The cover clearing to the stage: an airy whoosh falling away and a soft
+  // reverse swell gliding up a tone into the stage's own tonic (`root`, its
+  // theme's key), resolving as the green clears so it leads into the
+  // stage's music.
+  'sfx.entranceReveal'(ctx, out, t, o, bank) {
+    const root = o.root ?? BOLT_E * 2;
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 2.1, pan: 0, send: 0.5 });
+    return max(
+      swell(ctx, s.input, t, bank, { kind: 'bandpass', from: 6000, to: 900, q: 0.7, rise: 0.2, level: 0.13, decay: 0.12, pan: -0.25 }),
+      swell(ctx, s.input, t + 0.01, bank, { kind: 'bandpass', from: 6500, to: 1000, q: 0.7, rise: 0.2, level: 0.13, decay: 0.12, pan: 0.25 }),
+      ring(ctx, s.input, t, {
+        freq: root, level: 0.05, rise: 2, riseTime: 0.4, a: 0.36,
+        partials: [[1, 1, 0.3], [1.5, 0.55, 0.26], [2, 0.4, 0.22], [0.5, 0.5, 0.32]],
+      }),
     );
   },
 });

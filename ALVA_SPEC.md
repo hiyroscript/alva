@@ -1165,7 +1165,10 @@ neither player learns the other's address.
   turn-around. The host is Player 1's side (left, red), the guest Player
   2's (right, blue); each player is shown on their own side, by their
   online name (the HUD cards, the name tags), in Local Play's two colours.
-  The drawn stage shows over the intro.
+  The drawn stage shows from the moment the match entrance's cover clears
+  to it (7.2.8a), through the intro. The entrance is steps of the match
+  like any other, so both browsers play it step for step and start the
+  intro on the same step.
 - **No pause online.** Options / Menu, Esc, P and the HUD's pause open a
   menu with only **Leave match** (and its X), and the world does not stop:
   the player's own fighter plays nothing while it is open. Leaving is a
@@ -4888,6 +4891,63 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   and rematch clear overtime: the normal period, 0–0, `5:00`, the stage's
   own Void and normal waves.
 
+#### 7.2.8a The match's entrance
+
+Every match a battle screen starts (Quick Battle, Adventure, Local Play,
+Watch Mode, Online Play; Restart and Rematch too, each a fresh match)
+begins with its entrance, before its intro; Practice Ground has none. It is
+presentation only: the score, the statistics, the clock, the fighters'
+data and every rule of the match are as they were without it. One timeline
+(`CONFIG.battle.entrance`, `js/game/entrance.js`), in named steps:
+
+- **Part A, the versus screen** (its own canvas over the battle, under the
+  pause menu). A green lightning bolt (Alva's green, a near-white core)
+  strikes down the middle of the screen, top to bottom in 0.12 s, with a
+  low green-white flash and a small shake at contact, then flickers:
+  Team I's half on the left, Team II's on the right, as the HUD names them.
+  Its jagged, slightly leaning shape and its two to four forks are drawn
+  from the match's seed (the same on both browsers online, another each
+  match). Behind it is the frame the player had (the loading screen's last
+  look, or the match just left) until the black fades in under it
+  (0.25 → 0.75 s). Team I's fighter slides down from above into the middle
+  of its half (0.95 s), Team II's up from below into its own (1.25 s), each
+  facing the bolt on its idle clip, about half the screen's height whatever
+  its art's size (an ensemble with all its members), its side (Team I and
+  Team II, Local Play's Player 1 and Player 2, Online Play's player names)
+  and its fighter's name under it. They hold to 3.5 s.
+- **Part B, the transition.** The bolt strikes again: a flash, its glow
+  blooming out from the centre line round a hard green-white core until
+  green covers the screen (0.28 s); under the cover the versus screen is
+  gone and the stage is there, empty; the cover clears from the centre
+  outward (0.45 s).
+- **Part C, the camera-led spawns.** No fighter on the stage: none drawn,
+  shadowed, marked or in play. The camera holds the stage's centre at the
+  match start's framing, then zooms toward Team I's spawn (1.6×, 0.6 s,
+  eased); Team I's fighter appears exactly 0.5 s after the zoom arrives,
+  with the respawn's burst (its elimination burst played backwards, started
+  its life earlier so it pops as the fighter appears) and the spawn's
+  sound; a beat, back to the centre; then the same for Team II. The zoom is
+  a pure 2D zoom of the picture: the stage's one-point perspective,
+  parallax and horizon never change (7.1; `js/game/rendering/
+  screen-zoom.js`).
+- **Then the intro**, unchanged (ROUND 1 / FIGHT, Adventure's LEVEL),
+  starting with the camera home and handed to the follow camera without a
+  jump; the HUD, the move HUDs and the touch controls, hidden through the
+  entrance, fade in as it starts, and play comes on as it always did.
+- **The world holds still** through it: no clock, no CPU, no hazard, no
+  physics, no respawn; inputs locked, the presses buffered meanwhile
+  dropped as it ends (only the stage's own scenery and the Void's waves
+  move). Pause holds it; a resize lays it out again where it is; leaving
+  ends it. It runs on the simulation clock, so Online Play's two browsers
+  play it step for step.
+- **Reduced motion**: the same steps and times (so an online match starts
+  in step either way): no shake, no overshoot, no flicker's re-roll; the
+  fighters fade in where they stand; the cover is a plain fade; the zoom a
+  gentler 1.25×.
+- **Sound** (7.5): the bolt's strike, the bolt covering the screen and the
+  reveal, each at its step's start; the spawn's sound as each fighter
+  appears; the stage's theme starts with the reveal.
+
 #### 7.2.10 The match's end and the celebration
 
 - **Four things kept apart.** Whether the competitive match is live
@@ -4895,7 +4955,9 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   world runs (always, unless the player paused it), whether the player
   paused it (the screen's pause menu, and anything opened over it), and
   whether the Match Results are on show (the screen's; they pause nothing).
-  The phases are `intro` (inputs locked), `fight` and `celebration`.
+  The phases are `entrance` (a battle screen's match entrance, 7.2.8a:
+  the world held, inputs locked), `intro` (inputs locked), `fight` and
+  `celebration`.
 - **The end, exactly once** (`Battle.finishMatch`): the moment the result
   is known (the third point, as the Void takes the loser; the normal clock
   or overtime running out), the Battle freezes it (`Battle.final`: the
@@ -5533,7 +5595,8 @@ Adding one is described in
 - **Rematch**: a clean match on the same settings (mode, fighters, stage,
   level): 0–0, 5:00, no overtime, the stage's own Void, fresh fighters,
   every projectile and summon gone, the statistics and the celebration
-  over, the toast, dialog and banners gone, its intro first.
+  over, the toast, dialog and banners gone, its entrance (7.2.8a) and its
+  intro first.
 - **Change Fighters**: Quick Battle's Select Fighter (Regular Play then
   draws the CPU and the stage as usual; Custom Play goes on to Select CPU
   and Select Stage), Watch Mode's Select CPU 1; the mode and the level
@@ -6247,8 +6310,10 @@ codename is sent, never what an action does.
 
 ### 7.5 Sound
 
-Alva's sound is exactly the twelve kinds the owner asked for and nothing
-else (the Sound update; the architecture, every piece and the themes:
+Alva's sound is exactly the sixteen kinds the owner asked for and nothing
+else (the Sound update's twelve, and the match entrance's four: the spawn,
+the bolt's strike, the bolt covering the screen and the reveal; the
+architecture, every piece and the themes:
 [`docs/systems/audio.md`](docs/systems/audio.md)). Every sound is
 synthesized live on Web Audio from code; no audio file is shipped. No menu,
 hit, jump, footstep, announcer, click, countdown, Energy, hazard or
@@ -6268,7 +6333,8 @@ character sound exists, and the menus stay silent.
 - **Changes of version.** Overtime comes in on the next bar line (the next
   beat when a bar is longer than 1.5 s) with a pickup; the match's end cuts
   on the next beat into its sting with a tail of under a beat; a restart or
-  rematch starts the Main Battle cleanly from its intro; pause ducks the
+  rematch starts the Main Battle cleanly from its intro, from the match
+  entrance's reveal (the music is silent under its versus screen); pause ducks the
   music about 10 dB under a gentle low-pass (Online Play has no pause);
   leaving fades everything out in 0.6 s. Crossfades are equal-power; a change
   never clicks, gaps or doubles up.
@@ -6276,7 +6342,14 @@ character sound exists, and the menus stay silent.
   but satisfying), the universal ejection (Local Play and Watch Mode), the
   successful Deflect (only when a Deflect turns a projectile back, once per
   Deflect), the Perfect Shield (in place of the block's sound), the Shield
-  block, and the Shield held (a hum while it is up). An ejection is every
+  block, and the Shield held (a hum while it is up); the spawn (a punchy
+  pop, a low thump and a shimmer rising into place, as a fighter's spawn
+  burst pops: every Void respawn, Practice Ground's included, and both of
+  a match entrance's spawns) and the entrance's three (7.2.8a): the bolt's
+  strike (a sharp electric crack, a sizzle and a quiet hum gone as the
+  black finishes), the bolt covering the screen (a bigger crack and a roar
+  swelling to full cover) and the reveal (an airy whoosh resolving onto
+  the stage's own tonic, leading into its theme). An ejection is every
   way a fighter leaves play to the Void (a fall, a launch, overtime's
   closing Void, the loser's ejection at the match's end), one sound per exit.
   They play for every fighter on screen, from the shared systems alone,

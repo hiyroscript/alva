@@ -1,7 +1,7 @@
 // The Sound update: the engine (js/core/audio-manager.js) on a mocked Web
 // Audio (tests/helpers/fake-audio.mjs), its state machine and point of
-// view, the guard that keeps Alva's sounds to the twelve kinds the owner
-// asked for, the themes as data, and the game's events heard on real
+// view, the guard that keeps Alva's sounds to the sixteen kinds the owner
+// asked for (the Sound update's twelve, and the match entrance's four), the themes as data, and the game's events heard on real
 // Battles and Practice Ground through BattleAudio: one ejection a exit
 // (Battle.ejectLoser after a Void fall included), a Deflect's sound only
 // for a real turn-back, a perfect block never stacked on a block, the
@@ -208,11 +208,16 @@ test('the music\'s state machine: idle → battle → overtime → victory, defe
 
 // ---- The guard ------------------------------------------------------------------------
 
-test('the guard: exactly the twelve kinds the owner asked for, 33 pieces in all, and nothing else can ever be registered', () => {
+test('the guard: exactly the sixteen kinds the owner asked for, 37 pieces in all, and nothing else can ever be registered', () => {
   assert.deepEqual([...THEMED_STAGES], ['desert', 'city', 'asperitas', 'adamaris', 'jokull']);
   assert.deepEqual([...MUSIC_VERSIONS], ['main', 'overtime', 'victory', 'defeat', 'draw']);
-  assert.equal(ALLOWED_SOUNDS.length, 25 + 1 + 7);
-  assert.deepEqual([...new Set(Object.values(SOUND_KINDS))].sort(), ['1', '10', '11', '12', '2', '3', '4', '4b', '5', '6', '7', '8', '9']);
+  assert.equal(ALLOWED_SOUNDS.length, 25 + 1 + 11);
+  assert.deepEqual([...new Set(Object.values(SOUND_KINDS))].sort(), ['1', '10', '11', '12', '13', '14', '15', '16', '2', '3', '4', '4b', '5', '6', '7', '8', '9']);
+  // The entrance's four, the owner's addition: nothing more.
+  assert.deepEqual(
+    [SFX.spawn, SFX.boltStrike, SFX.boltCover, SFX.entranceReveal].map((id) => SOUND_KINDS[id]), ['13', '14', '15', '16'],
+  );
+  assert.equal(Object.keys(SFX).length, 11, 'eleven effects');
   const registry = buildRegistry();
   assert.deepEqual(registry.ids().sort(), [...ALLOWED_SOUNDS].sort(), 'every allowed sound, each once');
   for (const name of ['move', 'confirm', 'hit', 'jump', 'menu', 'music.home.main', 'music.practice.main', 'sfx.hit', 'sfx.countdown', '']) {

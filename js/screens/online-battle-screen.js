@@ -10,7 +10,10 @@
 //     turn-around). The local player plays with their usual devices
 //     (keyboard, touch controls or any controller) on their own side: the
 //     host is p1 (left, red), the guest p2 (right, blue), each shown on
-//     their own side by name. The drawn stage shows over the intro.
+//     their own side by name. The match's entrance (js/game/entrance.js)
+//     is steps of the match like any other, so both browsers play it step
+//     for step and start the intro together; the drawn stage shows from the
+//     moment its cover clears to the stage, through the intro.
 //   - There is no pause. Options / Menu, Esc, P and the HUD's pause open a
 //     small menu with only Leave match, and the world goes on beneath it
 //     (the player's own fighter plays nothing meanwhile). Leaving is a
@@ -149,8 +152,10 @@ export class OnlineBattleScreen extends BattleScreen {
   }
 
   // The player's own controls (and their touch controls) follow play; while
-  // they are off (the menu, the Match Results) their frames are neutral.
+  // they are off (the menu, the Match Results, the match's entrance) their
+  // frames are neutral.
   setPlayActive(on) {
+    on = on && !this.entranceRunning;
     this.app.input.setGameplayActive(on);
     this.touch.setEnabled(on);
     this.padHint.sync(on, this.touch.scheme);
@@ -250,7 +255,9 @@ export class OnlineBattleScreen extends BattleScreen {
     this.closeMenu();
     this.showWaiting(false);
     this.revealName.textContent = t(`map.${setup.map.id}.name`);
-    this.reveal.hidden = false;
+    // Shown once the entrance's cover clears to the stage (see update).
+    this.reveal.hidden = true;
+    this.revealDone = false;
     this.token = {};
     const token = this.token;
 
@@ -258,11 +265,15 @@ export class OnlineBattleScreen extends BattleScreen {
     app.loading.show(t('common.loadingName', { name: defs.map((d) => d.displayName).join(' · ') }));
     const sprites = await this.loadFighters(defs);
     if (token !== this.token) return;
-    app.loading.hide();
+    // The bolt strikes over the loading overlay's last look when it shows
+    // (see BattleScreen.startEntrance).
+    const loadingShown = this.loadingShown;
     if (defs.some((d) => !sprites.get(d.id)?.usable)) {
+      app.loading.hide();
       await this.endOnline('fighter');
       return;
     }
+    if (!loadingShown) app.loading.hide();
 
     this.lockstep = new LockstepSession({
       transport,
@@ -288,6 +299,9 @@ export class OnlineBattleScreen extends BattleScreen {
       seed: setup.seed,
       automaticTurnAround: setup.automaticTurnAround,
       labels: setup.labels,
+      // Its entrance first, the same steps on both browsers.
+      entrance: true,
+      onPhase: (phase) => this.onBattlePhase(phase),
     });
     this.lockstep.attach(this.battle);
     // Its sound from this player's side (the battle has no pause online).
@@ -303,6 +317,7 @@ export class OnlineBattleScreen extends BattleScreen {
     this.unsubKey?.();
     this.unsubKey = app.input.onKey((e) => this.onKey(e));
     globalThis.document?.activeElement?.blur?.();
+    this.startEntrance({ over: loadingShown ? app.loading.root : null });
     this.setPlayActive(true);
     this.syncAbilityHud();
     this.el.classList.add('is-live');
@@ -310,8 +325,26 @@ export class OnlineBattleScreen extends BattleScreen {
 
   update(dt) {
     super.update(dt);
-    // The drawn stage shows through the intro.
-    if (!this.reveal.hidden && this.battle && this.battle.phase !== 'intro') this.reveal.hidden = true;
+    this.syncReveal();
+  }
+
+  // The drawn stage shows from the moment the entrance's cover has cleared
+  // to it, through the intro, and goes once the fight starts.
+  syncReveal() {
+    const battle = this.battle;
+    if (!battle || this.revealDone) return;
+    const t = battle.entranceTime;
+    const show = battle.phase === 'intro' || (t !== null && t >= battle.entrance.revealEnd);
+    if (show) this.reveal.hidden = false;
+    else if (!this.reveal.hidden && battle.phase !== 'entrance') {
+      this.reveal.hidden = true;
+      this.revealDone = true;
+    }
+  }
+
+  // Each side is its player, by name.
+  entranceSideName(slot) {
+    return this.setup?.labels?.[slot] ?? super.entranceSideName(slot);
   }
 
   // The lockstep's news.
@@ -377,6 +410,8 @@ export class OnlineBattleScreen extends BattleScreen {
 
   openMenu() {
     if (this.menuOpen || !this.battle) return;
+    // Over the entrance, never under the loading overlay.
+    this.settleEntrance();
     this.menuOpen = true;
     this.menuOverlay.hidden = false;
     this.setPlayActive(false);
@@ -439,6 +474,7 @@ export class OnlineBattleScreen extends BattleScreen {
 
   // The match's own pieces, let go (the peer link stays: the room owns it).
   teardownMatch() {
+    this.endEntrance();
     this.unsubLockstep?.();
     this.unsubLockstep = null;
     this.lockstep?.dispose();

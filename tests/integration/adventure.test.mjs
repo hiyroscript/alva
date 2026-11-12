@@ -95,7 +95,13 @@ test('the full flow: a level, a fighter, the cards at Level 5, then the battle w
   assert.equal(screen.hud.levelTag.hidden, false);
   assert.equal(screen.hud.levelTag.textContent, 'Lv 05 · Venture');
   assert.equal(screen.pauseKicker.textContent, 'Adventure');
-  // The intro announces the level and Venture at it.
+  // The match's entrance first (js/game/entrance.js), no banner over it;
+  // then the intro announces the level and Venture at it.
+  assert.equal(battle.phase, 'entrance');
+  screen.updateBanner();
+  assert.equal(screen.bannerMain.textContent, '');
+  while (battle.phase === 'entrance') battle.update(CONFIG.sim.step);
+  assert.equal(battle.phase, 'intro');
   screen.updateBanner();
   assert.equal(screen.bannerMain.textContent, 'LEVEL 05');
   assert.equal(screen.bannerSub.textContent, 'Venture · ×5.06 smarter');

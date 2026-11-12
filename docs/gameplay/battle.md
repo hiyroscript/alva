@@ -108,13 +108,53 @@ draw ejects nobody. Each is decided at that very step: Launch Point recovered
 afterwards never changes it. Restart and Rematch clear overtime: 0–0,
 `5:00`, the stage's own Void and normal waves.
 
+## The match's entrance
+
+Every match a battle screen starts (Quick Battle, Adventure, Local Play,
+Watch Mode, Online Play; Restart and Rematch each a fresh match) begins
+with its entrance, before its intro ([`ALVA_SPEC.md`](../../ALVA_SPEC.md)
+§7.2.8a); Practice Ground has none. One timeline, every time in
+`CONFIG.battle.entrance` ([`js/game/entrance.js`](../../js/game/entrance.js)),
+its named steps:
+
+| Part | Steps | What happens |
+| --- | --- | --- |
+| A, the versus screen | `strike` (0 s), `black` (0.25 s), `teamI` (0.95 s), `teamII` (1.25 s), `hold` | The green bolt strikes down the middle (Team I's half left, Team II's right, as the HUD), the black fades in under it, Team I's fighter slides down from above into its half, Team II's up from below, each on its idle clip, its side and name under it |
+| B, the transition | `cover` (3.5 s), `reveal` (3.78 s) | The bolt strikes again and its glow covers the screen; under it the stage, empty; the cover clears from the centre |
+| C, the camera-led spawns | `centre` (4.23 s), `zoomI` (4.85 s), `awaitI`, `beatI`, `backI`, `between`, `zoomII`, `awaitII`, `beatII`, `backII`, `settle` | The camera holds the centre, zooms 1.6× toward Team I's spawn; 0.5 s after it arrives Team I's fighter appears with the respawn's burst and the spawn's sound; back to the centre; the same for Team II |
+| | then the intro (about 9.45 s in) | ROUND 1 / FIGHT as ever, the HUD fading in |
+
+It is a phase of the `Battle` built with `entrance` (every battle screen
+builds its own so; a headless `Battle`, a test's or a benchmark's, starts
+on its intro): `PHASES.entrance`, before `intro`. Through it the world holds
+still (`Battle.stepEntrance` runs instead of the world's step: no clock,
+CPU, hazard, physics or respawn), inputs are locked and the presses
+buffered meanwhile are dropped as it ends; the intro then starts with
+`phaseTime` 0, so its banners keep their timing. Both fighters wait off the
+stage (`Fighter.awaitingEntrance`: out of play, undrawn, never counted as a
+fall) until their step; nothing of the score, the statistics or the
+ejections sees it. It is counted on the simulation clock: a pause holds
+it, and Online Play's two browsers play it step for step and start the
+intro on the same step (the lockstep runs its steps like any others). With
+reduced motion it keeps the same steps and times, only drawn more gently.
+
+The battle screen draws Parts A and B on a canvas of its own
+(`js/game/rendering/match-entrance.js`) over the battle canvas, under the
+pause menu: while the loading overlay shows, that canvas lies over it until
+the black is whole, so the bolt strikes over the loading screen's last look.
+The HUD, the move HUDs, the touch controls and the Screen Pad hint are
+hidden throughout and fade back in as the intro starts, when play comes on
+as it always did. Part C's camera is a pure 2D zoom of the picture
+([rendering](../systems/rendering.md#the-match-entrance)). Restart and
+Rematch replay it; leaving the screen ends it.
+
 ## The match's end
 
 A match's lifecycle keeps four things apart: whether the competitive match
 is live (`Battle.matchLive`), whether the world runs (always, unless the
 player paused it), whether the player paused it, and whether the Match
-Results are on show. Phases: `intro` (inputs locked), `fight`,
-`celebration`.
+Results are on show. Phases: `entrance` (a battle screen's, see above),
+`intro` (inputs locked), `fight`, `celebration`.
 
 **Exactly once.** The moment the result is known (the third point, as the
 Void takes the loser; the clock or overtime running out),
@@ -153,7 +193,8 @@ whoever was already waiting to respawn included. A CPU celebrates
   Point), the winner's column brought forward. The world runs on behind
   it; the player's controls are off while it is open. The X, `Esc` / Back
   or Start close it back to the toast (Start never rematches). Its actions:
-  - **Rematch:** a clean match on the same settings, its intro first.
+  - **Rematch:** a clean match on the same settings, its entrance and its
+    intro first.
   - **Change fighters:** Select Fighter; Regular Play then draws a CPU and
     a stage as usual, Custom Play goes on to Select CPU and Select Stage.
   - **Change stage** opens the mode's own Select Stage with the fighters
@@ -194,13 +235,14 @@ short burst plays where it went in, in the fighter's own colours (see
 play changes.
 
 **The music** (the Sound update, [audio](../systems/audio.md)). The stage's
-Main Battle version plays from the intro; overtime switches on the next
+Main Battle version plays from the entrance's reveal, the versus screen
+silent but for the bolt; overtime switches on the next
 bar line (or beat) to its Overtime version, whose intensity follows the
 closing Void's pressure; the match's end cuts on the beat into the Victory,
 Defeat or Draw version, from Player 1's point of view (Adventure's too;
 Online Play's from this player's), then a calm loop under the celebration
-and the Match Results. Rematch and Restart start the Main Battle again from
-its intro; the pause menu ducks it; leaving fades it out. Every way a
+and the Match Results. Rematch and Restart fade it out as the bolt strikes
+and start the Main Battle again from its intro with the reveal; the pause menu ducks it; leaving fades it out. Every way a
 fighter leaves play to the Void (a fall, overtime's closing Void, the
 loser's ejection) sounds once: the opponent's ejection, or the player's own.
 
@@ -259,7 +301,10 @@ How the CPU plays: [CPU Intelligence](../systems/ai.md).
 | | |
 | --- | --- |
 | [`js/screens/battle-screen.js`](../../js/screens/battle-screen.js) | Loading the fighters (refusing one that is not playable), the HUD, pause (with Settings and the X), the final announcement, the result toast, the Match Results and their navigation (Rematch, Change fighters, Change stage, Return to home screen), restart. Also runs Watch Mode. |
-| [`js/game/battle.js`](../../js/game/battle.js) | `Battle`: phases (intro, fight, celebration), each mode's clock, overtime (`period`, `overtimeProgress`), the score, the match's end (`finishMatch`, `final`), each side's controller (`BATTLE_MODES`) and its celebration. |
+| [`js/game/entrance.js`](../../js/game/entrance.js) | The match entrance's timeline (`entranceTimeline`: its steps, the events a Battle acts on, its total), `entranceStep`, `entranceFraming` (Part C's camera). |
+| [`js/game/rendering/match-entrance.js`](../../js/game/rendering/match-entrance.js) | `MatchEntranceArt`: the versus screen and its cover on their own canvas; `ENTRANCE_LOOK`. |
+| [`js/game/rendering/screen-zoom.js`](../../js/game/rendering/screen-zoom.js) | The screen-space zoom Part C's camera is drawn through. |
+| [`js/game/battle.js`](../../js/game/battle.js) | `Battle`: phases (entrance, intro, fight, celebration), the entrance's steps and its camera, each mode's clock, overtime (`period`, `overtimeProgress`), the score, the match's end (`finishMatch`, `final`), each side's controller (`BATTLE_MODES`) and its celebration. |
 | [`js/game/match-stats.js`](../../js/game/match-stats.js) | `MatchStats`: each side's match statistics, frozen with the result. |
 | [`js/game/ai/celebration.js`](../../js/game/ai/celebration.js) | `CelebrationController`: a CPU's behaviour once the match is over. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The fixed-step world, the Void (closing it in: `setVoidPressure`, `voidWaveSpeed`) and respawns, the camera and drawing. |

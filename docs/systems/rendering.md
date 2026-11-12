@@ -430,15 +430,117 @@ reach and fly in to that centre, quickening as they go; the ring closes
 from its widest; everything fades in; the white flash grows and pops at
 the very end, on the step the fighter appears. Every mode's respawns and
 Practice Ground's get it; a fighter already on the stage (a match's start,
-a restart or rematch, Practice Ground's arrivals and swaps) gets none, and
+a restart or rematch, Practice Ground's arrivals and swaps) gets none (a
+battle screen's match entrance brings each fighter on with this very burst,
+[above](#the-match-entrance)), and
 a restart during the wait clears it with the other effects. The same
 shake and the same reduced-motion handling (no shake, short travel).
 Tuning: `HIT_FX.elimination`, the one source for both. Paint only: the
 wait and the respawn are exactly as without it, and the fight steps the
 same with or without it.
 
+## The match entrance
+
+A battle screen's match entrance ([battle](../gameplay/battle.md#the-matchs-entrance))
+is drawn in two places.
+
+**The versus screen and its cover** (Parts A and B) are drawn by
+`MatchEntranceArt` ([`js/game/rendering/match-entrance.js`](../../js/game/rendering/match-entrance.js))
+on a canvas of its own, over the battle canvas and every piece of the
+match's chrome, under the pause menu and the Match Results, with the
+battle canvas's device-pixel-ratio cap (`CONFIG.render.dprCap`) and Canvas
+2D only. Its time is the Battle's (`Battle.entranceTime`, between steps by
+the frame's `alpha`), so a pause holds it. Its look is `ENTRANCE_LOOK`
+(every size a share of the canvas's height or width, so a resize lays it
+out again where it is; its timing is `CONFIG.battle.entrance`):
+
+- The bolt: a jagged, slightly leaning line down the middle with two to
+  four forks (`boltShape`, from the match's seed and `Battle.matchIndex`:
+  the same on both browsers online, another each match), three strokes (a
+  blurred glow in Alva's green `#2bff6a`, a bright mid stroke, a near-white
+  core `#eaffdc`), drawn top to bottom over 0.12 s, then flickering: its
+  joints re-rolled seven times a second (`boltPoints`), its glow pulsing.
+  A low green-white flash and a small shake at contact.
+- The black under it, eased in from 0.25 to 0.75 s. Before it, the canvas
+  is clear there: the player sees the frame they had (the battle canvas
+  keeps its last frame, and draws nothing of the new match until the
+  cover; while the loading overlay shows, the entrance's canvas lies over
+  it until the black is whole, then comes back under the pause menu).
+- Each side's fighter on its idle clip (`idlePose`, every member of an
+  ensemble at its home), mirrored to face the bolt by each clip's own
+  `sourceFacing`, at a whole number of device pixels per art pixel chosen
+  so its idle art (`idleBounds`, over the whole clip) stands about half the
+  screen's height, never wider than its half (`fighterScale`), image
+  smoothing off; sliding in with a small overshoot and two faint
+  afterimages; its side and name under it in the HUD's font.
+- The cover: the bolt's three strokes growing to 2.6 screen widths (the
+  green everywhere, its hard green-white core a broad band), then, the
+  stage under it, rubbed out from the centre outward (a `destination-out`
+  gradient).
+- Reduced motion: no shake, overshoot or re-roll (a gentler pulse); the
+  fighters fade in where they stand; the cover is a plain green fade in
+  and out.
+
+**The camera-led spawns** (Part C) are the battle canvas's own. The
+fighters still waiting (`Fighter.awaitingEntrance`) are out of play:
+`Arena.inPlay` leaves them out, so they have no body, shadow, ring, marker,
+status or trail on screen; each appears with the respawn's burst
+(`HitEffects.addSpawn`, started `HIT_FX.elimination.life` before it).
+
+### The screen-space zoom (strict)
+
+Part C's camera move toward a spawn is a pure 2D zoom of the picture,
+never a change of perspective. Every stage is drawn in one-point
+perspective ([`js/stages/perspective.js`](../../js/stages/perspective.js)),
+whose projection reads the view's place (`Perspective.y` against `refY`,
+the parallax layers against `view.x`): moving or resizing the view tilts
+the stage's planes, shifts the horizon and slides the layers. So through
+the entrance the view is a frozen lens, the home view (its `x`, `y`, `w`,
+`h` and `scale` never change: `Battle.syncView`), and the zoom is one
+affine applied after projection, in device pixels:
+`{ k, ox, oy }`, a frame pixel P landing at `(ox, oy) + k·P`, which is a
+scale k about the fixed point F = o / (1 − k): F + k·(P − F). A pan is a
+moving F, never a moving lens.
+
+Every draw path sets absolute transforms (`ctx.setTransform(1, 0, 0, 1, 0,
+0)` for screen space, `Perspective.plane`, a theme's `layer`), so an outer
+`ctx.scale` would be undone by the first of them. Instead
+`installScreenZoom` ([`js/game/rendering/screen-zoom.js`](../../js/game/rendering/screen-zoom.js))
+puts the zoom in front of every `setTransform` (either form) and
+`resetTransform` on the battle canvas's context for the length of one
+render (`Battle.render` through `withScreenZoom`), then gives the context
+back exactly as it was: the one place the zoom is composed. The theme's
+background, terrain, foreground and Void, `clipAboveRim`, `Arena.toScreen`'s
+screen points, the sprites, the shadows, the hit effects (the spawn burst
+among them) and the markers are all drawn through it unchanged. The
+framed region is held inside the home frame (`framedZoom`), so nothing
+the home frame did not draw ever shows; the spawn burst's shake nudges the
+zoom (`nudgedZoom`), never the lens, and only as far as that allows. It is
+exact and costs nothing: no offscreen buffer, every vector and pixel drawn
+at full resolution at the zoom. Line widths and text scale with the
+picture; a shadow's blur, which no transform reaches, does not.
+
+The lethal launch's zoom (`HIT_FX.lethal` in `Arena.syncView`) and the
+follow camera are untouched: this rule is the entrance's. The same helper
+could carry the lethal zoom as a screen-space zoom too; it does not.
+
+Measured in Chromium on all five battle stages at 1280 × 720: the zoomed
+frame matches the home frame scaled by 1.6 about F to a mean of about
+1/255 per channel (bilinear resampling and the stage's own sparkle), while
+a zoom made by moving and rescaling the view differs by 15 to 22 on average
+with about a tenth of the pixels badly off.
+
 ## Tests
 
+- [`tests/systems/match-entrance.test.mjs`](../../tests/systems/match-entrance.test.mjs):
+  the screen-space zoom's invariant (every world point at several depths,
+  on each stage's own projection, through `Perspective.plane`, the screen
+  identity and a parallax layer, landing at F + z·(home − F) within a
+  pixel), the lens never moving and the zoom held inside the home frame
+  through the whole entrance, the render drawn through it and the context
+  given back, the bolt's seeded shape, every fighter's size on the versus
+  screen, and the versus screen drawn at every step and laid out again on
+  a resize.
 - [`tests/systems/projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs):
   the spin (its angle from age, never its box, kept through a turn back)
   and the rotated draw on a recording canvas.
