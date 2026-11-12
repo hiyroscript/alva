@@ -1,0 +1,52 @@
+# Build native desktop installers from the shared, validated itch export.
+name: Native desktop builds
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: \${{ matrix.name }}
+    runs-on: \${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows installer
+            os: windows-latest
+            target: --win nsis --x64
+          - name: macOS disk image
+            os: macos-latest
+            target: --mac dmg
+          - name: Linux packages
+            os: ubuntu-latest
+            target: --linux AppImage deb
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the existing game build tools
+        run: npm ci
+      - name: Install Electron packaging tools
+        run: npm install --no-save --package-lock=false electron@latest electron-builder@latest
+      - name: Build the self-contained game
+        run: npm run build:desktop
+      - name: Package the desktop application
+        run: npx electron-builder \${{ matrix.target }}
+      - name: Keep installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: alva-desktop-\${{ matrix.os }}-\${{ github.sha }}
+          path: dist/installers/*
+          if-no-files-found: error
+          retention-days: 30
