@@ -1,5 +1,5 @@
 // Alva's Electron shell. The game itself is built by the existing itch
-// release pipeline and served from this app's private, local app:// origin.
+// release pipeline and served from this app's private, local alva:// origin.
 // Node integration stays disabled in the renderer.
 const { app, BrowserWindow, net, protocol, shell } = require('electron');
 const path = require('node:path');
