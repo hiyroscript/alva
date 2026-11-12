@@ -31,8 +31,6 @@ jobs:
           java-version: 21
       - name: Run the game and server tests
         run: node --test
-      - name: Run the game and server tests
-        run: node --test
       - name: Install Capacitor
         run: npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
       - name: Build the self-contained mobile game
@@ -46,7 +44,7 @@ jobs:
         run: cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: alva-android-debug-\${{ github.sha }}
+          name: alva-android-debug-${{ github.sha }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -63,6 +61,8 @@ jobs:
           cache: npm
       - name: Install the existing game build tools
         run: npm ci
+      - name: Run the game and server tests
+        run: node --test
       - name: Install Capacitor
         run: npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/ios@latest
       - name: Build the self-contained mobile game
@@ -78,7 +78,7 @@ jobs:
         run: ditto -c -k --sequesterRsrc --keepParent build/ios/Build/Products/Release-iphonesimulator/App.app alva-ios-simulator.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: alva-ios-simulator-\${{ github.sha }}
+          name: alva-ios-simulator-${{ github.sha }}
           path: alva-ios-simulator.zip
           if-no-files-found: error
           retention-days: 30
