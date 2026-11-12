@@ -890,14 +890,18 @@ Each level against itself (Watch Mode):
   `attack4`, cast 5 times in Easy's 676,803 presses (14 in 622,039
   before): a technique that needs a safe moment, which a casual player
   now makes even less often.
-- **Performance** was not measured again for this retune (a profile's
-  values change how well the CPU thinks, not what it computes a step). Last
-  measured with four fighters (Node, one process, Easy and Brutal mirrors
-  on both stages, every CPU step timed): 108 µs a step on average, 1.4 ms
-  at the 99th percentile, 3.0 ms at the 99.9th; the rare spikes past a
-  frame (16.7 ms) were garbage collection. The debug trace and its events
-  cost nothing with `debug` off. A browser on a phone is slower than Node:
-  check Watch Mode there (see the checklist below).
+- **Performance** (Node, one process, Easy and Brutal mirrors on both
+  stages, each fighter against the next round the roster, every CPU step
+  timed, two runs each): about 52 µs a step on average, before and after
+  alike (51.8 and 52.7 µs now, 50.2 and 54.1 µs before: the difference is
+  run-to-run noise), 0.65 ms at the 99th percentile, 1.4–1.5 ms at the
+  99.9th, the longest single step 11–15 ms (7 ms before), never past a
+  frame (16.7 ms) in 3.2 million steps. A less smart level costs no more:
+  its profile changes how well it decides, not what it computes. (With
+  four fighters, long before, it was 108 µs on average, 1.4 ms at the
+  99th percentile.) The debug trace and its events cost nothing with
+  `debug` off. A browser on a phone is slower than Node: check Watch Mode
+  there (see the checklist below).
 
 **Limitations.** The reference opponents, the competent one included, are
 scripts with no strategy: every level from Medium up beats them, so they

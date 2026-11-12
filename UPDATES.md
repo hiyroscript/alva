@@ -7075,7 +7075,8 @@ holds: Brutal beats Hard 88.5% (88.9%), Hard beats Medium 97.3% (89.5%,
 Medium having lost more), Medium beats Easy 99.7% (99.6%). Brutal against
 the benchmark composition: 98.3% (98.3%); against Hard alone still short
 of 95%. Every move is still used at every level; no stuck navigation in
-any match.
+any match. A CPU step costs the same as before, about 52 µs on average
+(0.65 ms at the 99th percentile, never past a frame).
 
 **Where to tune it.** `PROFILES` in [`js/data/difficulty.js`](./js/data/difficulty.js);
 Venture's growth and limits in [`js/data/adventure.js`](./js/data/adventure.js).
