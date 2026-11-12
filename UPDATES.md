@@ -7103,3 +7103,167 @@ against Unlimited Void and Hollow Purple (16 casts each, more than a
 third), the closing Void (eight seeds, 5 % nearer the centre), the Mash
 Combo test (a few more seeds for a lower level), and the telemetry test's
 seed.
+
+## #0017, the robot girl of cartoon strength
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0017 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon, no move the
+character cannot perform in canon, a gag character played with cartoon
+logic and creativity, a melee move that copies the strongest projectile of
+whoever it touches for its next use to throw back without the weapon that
+threw it, or takes the Energy of one that throws nothing, a five-star
+difficulty, the sheet's page on The Spriters Resource credited and the
+character named nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **A shared capability: the mimic** (`mimic: { spawnAt, offset, siphon
+  }` on a single melee strike, [`js/game/combat/mimic.js`](./js/game/combat/mimic.js),
+  validated in `createAttackDefinition`). A real hit copies the strongest
+  projectile its target throws (of those that fly and have their art: the
+  most damage one throw deals one target, then its launch, then a hold)
+  into its fighter's hands (`CombatState.copy`, one at a time); the next
+  use of a mimic throws that copy instead of striking, the projectile
+  alone in its own art, now the thrower's, built as a projectile attack
+  by the shared schema so its cooldown and its Energy are the policies'
+  for what it throws (`mimicThrow`, `Fighter.attackDef`,
+  `Projectile.release`'s `borrowed`). A target with nothing to copy gives
+  up `siphon` of its Energy instead, all of it to the mimic's fighter
+  (`CombatState.gainEnergy`, never past its bar): the one thing that gives
+  a fighter Energy. Hit events say what a touch took (`copied`,
+  `siphoned`); the cooldown policy counts it routine; the Mash Combo
+  refuses it as a partner; the CPU values a touch by what it would take
+  and reads a held copy as its throw (its moveset and capabilities keyed
+  by the copy). A mark over a fighter shows the copy it holds (its art in
+  a white ring: `copyMarkRect`, `drawCopyMark`, `Arena.copyMarkRect`).
+- **The fighter.** #0017 in roster slot 17, playable: 79 frames cut from
+  the sheet into `assets/characters/0017/`, read at 1× (one file pixel per
+  art pixel), each frame cut whole (her kick's and her flip's arcs, her
+  stick and its streak, her streaks of speed and the ground bursting round
+  her feet included, never a neighbour or the sheet's label), the flat
+  periwinkle background (128, 128, 255) made transparent, nothing redrawn,
+  recoloured or laid over anything, every file
+  `0017_<codename>_<frame>.png`, all of the fighter (she has no projectile
+  art: a copy she throws is drawn in its own fighter's). A drawing the
+  sheet repeats is cut once. Drawn at the roster's art-pixel size (a
+  43-pixel stance, about 73 units, one of the roster's smallest); every
+  clip authors its own `anchorX` on her overalls (her arcs, her stick,
+  her arms flung out and the ground's burst would pull the automatic
+  anchor off her body; the frames of one pose are anchored where their
+  twins' body is, matched on her cap), and her flight's arc that sweeps
+  under her keeps her where its twin stands (`anchorY`). Movement is the
+  universal one; her Energy refills at the shared 12 a second.
+- **Her moves**, from her canon (a robot girl of boundless strength in a
+  world of cartoon logic: she splits the earth with a punch, runs faster
+  than sound with her arms out like a plane's wings, headbutts whatever is
+  before her, launches herself into the sky, pokes things with a stick
+  and treats whatever anyone brings as a toy):
+  - The Spin Kick (a kick that holds, 1, then its arc, 3 sideways) and the
+    Stick Poke (her stick brought down before her, 3 sideways): her Mash
+    Combo pair. The Somersault Headbutt (3 sideways) in the air.
+  - Kiiin!: her arms flung out and away along the ground at 760 units/s
+    (`motion: roll`), about 310 units, bowling over whoever she meets.
+  - The Headbutt Dive: plunged head-first from mid-air (`motion: slam`, a
+    spike), the ground bursting round where she lands (`impact`, a quake,
+    64 units either side); once per airtime.
+  - The Rocket Headbutt: launched up head-first on the ground and in the
+    air (`motion: rise`), carrying her target and knocking it up; once
+    per airtime in the air: her way back.
+  - The Earth Chop, her Special, a technique: two fifths of a second
+    winding up, any blow breaking it, then the ground split round her, a
+    quake, 10 at Base Launch 3 straight up to whoever stands on it; the
+    policy's 5 s.
+  - Finders Keepers, her Special on the ground and in the air: her finger
+    poked out (1), a mimic that copies her opponent's strongest projectile
+    (#0001's sphere, #0002's whirlwind, #0007's rocket, #0016's arrow...)
+    for her next one to throw back without what threw it (15 Energy for an
+    ordinary copy; a 10-damage copy waits 5 s, one that holds 3 s), or
+    takes all the Energy of an opponent that throws nothing (#0003, #0005,
+    #0008, #0010, herself), every bit of it hers.
+  Her Shield is both fists raised; her Deflect a hop and a shout that
+  blows shots back; her Dash a sprint, her air dash a forward roll. She
+  summons nobody, makes no clone, never homes in, never heals and fires
+  no shot of her own. What of the sheet is no move (her poses, falls,
+  getting up, the electrified and burnt hurt poses, the costume, her head
+  popping off and the rest) is listed in her specification.
+- **Its controller layout** by the comfort rules (Square the Spin Kick /
+  the Somersault Headbutt, Triangle the Stick Poke, R2 Finders Keepers on
+  the ground and in the air, the right stick forward Kiiin!, down in the
+  air the Headbutt Dive, up the Rocket Headbutt on the ground and in the
+  air, L2 the Earth Chop), touch buttons, names and descriptions in
+  English and French, a Discover profile (5/5) and her credit (the sheet
+  ripped by Dazz & Fret on The Spriters Resource, linked by the asset's
+  number alone).
+- **The served file count** (1,986) and the release's module count (197)
+  brought up to date.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 384 matches a level): #0017 wins 0.49 at
+Medium, 0.49 at Hard and 0.42 at Brutal, inside the roster's usual range at
+Medium and Hard and near its low end at Brutal (as #0014 and #0006);
+weakest against #0005, #0006 and #0012 (5 or 6 of 24 at Hard), best
+against #0003 (19 of 24: it throws nothing, so her touch empties it and
+the Earth Chop finds it without a Shield) and #0004. Her first tuning won
+0.25 at Brutal: the CPU chased a touch on every opponent (a flat bonus on
+every touch, now gone: a touch is worth what its copy deals) and lost the
+neutral to every longer reach; Kiiin! and the Rocket Headbutt now send
+their target flying at Base Launch 3, the Stick Poke at 2, the Earth Chop
+reaches 120 units either side, her poke is a fifteenth of a second
+quicker and she steers a launch by 25°. Details in [#0017's
+specification](docs/characters/0017.md#balance).
+
+**Where to tune it.** Every value of hers is in
+`js/data/characters/0017.js`: the moves' phases are whole frames of their
+clips at `FPS_0017` (the orders `SPIN_KICK_0017`, `KIIIN_0017`,
+`FINDERS_KEEPERS_0017`, `EARTH_CHOP_CAST_0017` and the rest); reaches are
+the attacks' `hitbox`es and strikes; Kiiin!'s run is `KIIIN_RUN_0017`, the
+rocket's lift `ROCKET_0017`, the Earth Chop's hit `EARTH_CHOP_0017` and
+its burst, the Energy Finders Keepers takes `SIPHON_0017`; the anchors
+`ANCHORS_0017` and `FEET_0017`. What a touch copies and how a copy is
+weighed are the shared `strongestProjectile` / `projectileStrength` in
+`js/game/combat/mimic.js`; the CPU's worth of a touch is in
+`Evaluator.outcome` (`js/game/ai/cpu-intelligence/evaluator.js`).
+
+**Code:** `js/game/combat/mimic.js` (new), `js/game/combat/attacks.js`
+(the `mimic` field), `combat-state.js` (`copy`, `holdCopy`, `gainEnergy`,
+a copy let go as its throw releases), `combat.js` (a mimic's real hit,
+the events' `copied` and `siphoned`), `projectile.js` (a `borrowed`
+release), `hit-effects.js` (a comment), `js/game/fighters/fighter.js`
+(`attackDef`, the release carrying its copy), `js/data/cooldowns.js`
+(`mimic` and `siphon` routine), `js/data/mash-combo.js` (a mimic is no
+partner), the CPU (`js/game/ai/moveset.js`,
+`cpu-intelligence/capabilities.js`, `evaluator.js`), the mark
+(`js/game/rendering/fighter-status.js`, `js/game/arena.js`);
+`js/data/characters/0017.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0017.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, Energy, defense,
+launch, rendering, input, AI, testing, the served file and module
+counts).
+
+**Tests:** new `tests/systems/mimic.test.mjs` (the field and what it
+refuses, routine for the cooldown policy and never a Mash Combo partner,
+the strongest projectile and what is never copied, a copy taken and
+thrown as the thrower's own, priced by the policies, a cut throw keeping
+it, a block taking nothing, the siphon to the attacker and never past its
+bar, the CPU's reading) and `tests/fighters/0017/fighter-0017.test.mjs`
+(registration and kit; her costs and cooldowns; her Specials; her Mash
+Combo; her names, touch buttons and controller layout; the 79 files,
+clean and tight, no file twice, at one scale, anchored on her overalls;
+every move: the Spin Kick's hold and its block, the Stick Poke, the
+Somersault Headbutt, Kiiin!'s run and its block, the Headbutt Dive's
+spike and its burst, the Rocket Headbutt, the Earth Chop's quake either
+side, its jump, its block and its broken cast, Finders Keepers copying
+each shooter's strongest shot and throwing it, its costs and cooldowns, a
+block, a cut throw, a fresh life, the air touch, the siphon from every
+fighter that throws nothing, the CPU's reading; her Deflect; the CPU
+playing her whole kit, throwing copies and taking Energy; her source
+named nowhere); the hit event's shape (`launch`), the held-copy mark
+(`fighter-status`), the roster-wide tables
+(`cooldown-policy`, `special-abilities`: twenty-seven Specials,
+`strict-combat-rules`, `mash-combo`), `empty-roster`, `discover`,
+`practice-ground`, `watch-mode`, `settings` (her credit) and each
+fighter's roster list.

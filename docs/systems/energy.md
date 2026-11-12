@@ -19,7 +19,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.5.
 | Module | Owns |
 | --- | --- |
 | [`js/data/energy.js`](../../js/data/energy.js) | The policy, the one source of every price: `MAX_ENERGY`, `ENERGY_COST` (15), `DASH_ENERGY_COST`, `BLOCK_ENERGY_COST`, `DEFLECT_ENERGY_COST`, `CONSTRUCT_ENERGY_COST` (all `ENERGY_COST`), `createsConstruct`, `constructEnergyCost`, `resolveMoveEnergy`. |
-| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `resolveEnergy` (the rules and a fighter's refill rate; anything else refused), the constants re-exported, and the state on `CombatState`: `energy`, `maxEnergy`, `energyExhausted`, `spendEnergy`, `updateEnergy`, `setEnergy`. |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `resolveEnergy` (the rules and a fighter's refill rate; anything else refused), the constants re-exported, and the state on `CombatState`: `energy`, `maxEnergy`, `energyExhausted`, `spendEnergy`, `updateEnergy`, `setEnergy`, `drain`, `gainEnergy` (a mimic's siphon). |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js), [`technique.js`](../../js/game/combat/technique.js), [`summon.js`](../../js/game/combat/summon.js) | Each definition's `energyCost`, derived from what it creates and its cooldown class. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Paying for a Dash (`tryDash`), an air dash (`tryAirDash`) or a construct move (`tryAction`, `trySummon`, `tryTechnique`), all through `payEnergy`; refusing a Deflect while exhausted (`tryDeflect`, which pays nothing); refilling every step nothing was paid on (a payment made later in the step, a Deflect's, takes that step's refill back: `energyRefilled`). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | Paying for a blocked hit (`applyHit`), a perfect one exactly as any other, and for a Deflect's first projectile turned back (`deflectProjectiles`, through `payEnergy`, the attack record marked `paid`, the cost on the deflection's `energyCost`). |
@@ -86,6 +86,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0014 | Waterkick (attack4: its wave, a projectile) | Sunburst Fist (5 s) |
 | #0015 | the Gift and the Air Gift (attack3: its present, a projectile that never moves), the Pink Typhoon and the Air Pink Typhoon (attack4: its tornadoes) | — |
 | #0016 | the Twin Pistols and the Air Twin Pistols (attack2: a volley of shots, 15 for the whole volley), the Silent Arrow (attack3, a technique: her arrow) | the Medipack (3 s) |
+| #0017 | — (nothing of her own creates anything; every copy she throws with Finders Keepers is an ordinary construct, 15 for each throw) | the Earth Chop (5 s); a copy she throws that holds (3 s) or deals 10 (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
@@ -104,7 +105,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008,
-#0009, #0010, #0011, #0012, #0013, #0014, #0015 and #0016 leave it out (12). Nothing
+#0009, #0010, #0011, #0012, #0013, #0014, #0015, #0016 and #0017 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than
@@ -139,12 +140,22 @@ fighter and the field.
   before turning anything back, only the air dash pays.
 - Nothing gives Energy back: no block, perfect block, Deflect that lands,
   projectile turned back or cancelled move refunds anything or adds a
-  refill of its own. Only the passive refill, and a full refill on a
-  respawn, a reset or a restart, raise it.
+  refill of its own. Only the passive refill, a full refill on a respawn,
+  a reset or a restart, and one thing taken off another fighter raise it:
+  a mimic's `siphon` (#0017's Finders Keepers,
+  [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)). A real hit
+  of a mimic on a fighter that throws nothing to copy takes its `siphon`
+  off that fighter as a drain does (never below 0, reaching 0 exhausting
+  it), and all of it goes to the mimic's fighter at once
+  (`CombatState.gainEnergy`), never past its full bar (100); reaching the
+  full bar ends that fighter's own exhaustion, as any full bar does. It is
+  no payment and no refill of its own: neither fighter's refill changes. A
+  blocked touch takes nothing.
 - A hit may take Energy away: a real hit with a `drain` (a shared hit
   effect, [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox))
   takes that much off its target at once (`CombatState.drain`), never
-  below 0, and gives it to nobody: its attacker gains nothing. It is no
+  below 0, and gives it to nobody: its attacker gains nothing (only a
+  mimic's siphon, above, gives what it takes to its attacker). It is no
   payment (the target's refill runs on, `energySpent` is untouched), and
   reaching 0 exhausts the target as any 0 does. A blocked hit drains
   nothing: the Shield pays its own 15 for the block, as ever (#0013's
