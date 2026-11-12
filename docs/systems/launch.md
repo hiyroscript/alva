@@ -105,12 +105,14 @@ up to 0.55 s, #0007, #0008, #0009 and #0010 0.15 s up to 0.5 s, #0011
 0.12 s up to 0.4 s, the roster's least: its spider-sense; #0012 0.14 s up
 to 0.45 s, its cybernetic agility; #0013, #0014 and #0015 0.15 s up to 0.5 s;
 #0016 0.14 s up to 0.45 s, an acrobat; #0017 0.1 s up to 0.35 s, a robot
-who shrugs off what would floor anyone else; the
+who shrugs off what would floor anyone else; #0018 0.15 s up to 0.45 s,
+light and quick; the
 first six, #0010, #0013, #0014 and #0015 tumble from 1100 units/s, #0007, #0008, #0009, #0011,
-#0012 and #0016 from 1150, #0017 from 1250; #0001 steers
+#0012, #0016 and #0018 from 1150, #0017 from 1250; #0001 steers
 a launch up to 18°, #0002 15°, #0003 20°, #0004 18°, #0005 20°, #0006 20°,
 #0007 20°, #0008 20°, #0009 30°, the roster's most: light on the wind,
-#0010 15°, #0011 25°, #0012 25°, #0013 20°, #0014 20°, #0015 20°, #0016 25°, #0017 25°).
+#0010 15°, #0011 25°, #0012 25°, #0013 20°, #0014 20°, #0015 20°, #0016 25°, #0017 25°,
+#0018 20°).
 
 A launching hit also ends a paralysis on the spot (a hit's `paralyze`,
 see [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)), and a

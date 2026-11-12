@@ -7419,3 +7419,155 @@ with the camera unmoved; leaving the screen with nothing left behind; no
 console error. The zoom compared with the home frame scaled about its
 focus on all five stages (above). Screenshots:
 [`docs/screenshots/match-entrance/`](./docs/screenshots/match-entrance/).
+
+## #0018, the devoted stalker in a sailor uniform
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0018 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon (not everything
+an animation and damage), no move the character cannot perform in canon,
+creativity, the sheet's page on DeviantArt credited and the character
+named nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **A shared capability: the lob** (`arc: { lift, gravity }` on a
+  projectile, [`js/game/combat/projectile.js`](./js/game/combat/projectile.js),
+  validated in `createProjectileDefinition`). A lobbed projectile leaves
+  going up at its `lift` and falls under its own `gravity`, its `speed`
+  still carrying it the way it was thrown: it rises and comes down ahead
+  of its thrower, over whoever is too near. Its height is exactly
+  `projectileDrop`'s curve (`projectileLaunchVy` from the release), step
+  for step, and the CPU predicts it on that same curve: `projectileContact`
+  when it weighs a throw, `projectileThreat`, `hitsAt` and `deflectTiming`
+  from a live one's height and its speed up or down (`vy`, as perceived)
+  when it answers one. The floor ends it as it ends any shot; turned back,
+  it keeps falling where it was; it needs a `speed`. A copy #0017 takes of
+  one flies its curve too (her low-hand test now aims a lob where it comes
+  down). **A gaze projectile is seen from the side it comes from**: the
+  combat system asks `hitReaches` with the side the projectile travels
+  from rather than where it happens to be, so a lob dropping past a
+  fighter's middle, or a shot flying on past one turned away, never
+  reaches the front of a fighter with its back to it (no other fighter
+  throws a gaze shot; #0005's gaze is a burst).
+- **The fighter.** #0018 in roster slot 18, playable: 69 frames cut from
+  the sheet into `assets/characters/0018/`, read at 1× (one file pixel per
+  art pixel), each frame cut whole (her blades' arcs, her axe and its blur,
+  her arm's whip and her streaks of speed included, never a neighbour or
+  the sheet's labels), the flat navy background (0, 64, 128) made
+  transparent, nothing redrawn, recoloured or laid over anything, every
+  file `0018_<codename>_<frame>.png`. A drawing the sheet repeats under one
+  move is cut once (the grenade it draws five times along its arc, her
+  phone lowered the way it was raised); a clip plays its own codename's
+  files, so a drawing two codenames share is a file under each. Drawn at
+  the roster's art-pixel size (a 50-pixel stance, about 85 units); every
+  clip authors its own `anchorX` on her navy uniform. Movement is the
+  universal one; her Energy refills at the shared 12 a second.
+- **Her moves**, from her canon (a schoolgirl who keeps a diary on her
+  phone of everything her beloved does, stalks unseen and cuts down
+  whoever is in the way with a kitchen knife, a katana, a hatchet or an
+  axe; once, a flash grenade that knocked everyone out):
+  - The Kitchen Knife (3 sideways, her quickest blow) and the Katana Draw
+    (3 at Base Launch 2 sideways): her Mash Combo pair. The Air Katana (3
+    sideways) in the air.
+  - The Stalker's Lunge: away low along the ground, knife first (`motion:
+    roll`, about 130 units); the Stalker's Dive: at her prey from mid-air
+    (`motion: homing`), once per airtime. Each lands 5 at Base Launch 3
+    instead of 3 in a back turned to her (`backstab`).
+  - The Flash Grenade: a hop, then a grenade lobbed (`arc`) that comes
+    down 150 to 270 units off; the Air Flash Grenade drops one level from
+    her hand. Its flash holds still for 1 s whoever it reaches facing it
+    (`paralyze`, a `gaze`): time to get behind it for the backstab. The
+    policy's 3 s, no Energy. The ground throw ends with her back on the
+    floor, so the button pressed again is the same move, held by its
+    cooldown, never a second grenade from the air.
+  - The Diary, her Special, a technique: seven tenths of a second reading
+    her phone, any blow breaking it, then out of sight for 3 s (`cloak`);
+    the policy's 3 s.
+  - The Axe Swing, her Special, a technique: three fifths of a second
+    hefting her axe, any blow breaking it, then swung up and round, 24
+    units behind her to 60 in front: 10 at Base Launch 3 straight up, a raised guard
+    shoved back (`blockPush`); the policy's 5 s. Her one big launcher.
+  Her Shield is her katana held up; her Deflect a flying knee that kicks
+  shots back; her Dash and air dash a sprint leaning far forward. She
+  summons nobody, makes no clone, never heals and has no power beyond her
+  weapons, her body and her diary. What of the sheet is no move (her
+  entrance, the three ultimates, her other cuts, the grenade going off and
+  the rest) is listed in her specification.
+- **Its controller layout** by the comfort rules (Square the Kitchen Knife
+  / the Air Katana, Triangle the Katana Draw, Circle the Axe Swing, R2 the
+  Flash Grenade on the ground and in the air, the right stick forward the
+  Stalker's Lunge and the Stalker's Dive, L2 the Diary), touch buttons,
+  names and descriptions in English and French, a Discover profile (4/5)
+  and her credit (the sheet by xmaygrrr on DeviantArt, linked by the
+  deviation's number alone).
+- **The served file count** (2,059) and the release's module count (201)
+  brought up to date.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, four seeds: 272 matches a level): #0018 wins 0.47 at
+Medium, 0.56 at Hard and 0.53 at Brutal, inside the roster's usual range;
+weakest against #0007, #0016 and #0014 at Hard (6 or 7 of 16), best
+against #0013 (15 of 16) and #0010. Her first tuning, every launch
+sideways, won about half but no move of hers read to the CPU as a finish,
+so #0017's CPU in danger never broke off against her (the paired CPU
+scenarios); an upward Katana Draw made her far too strong (0.65, 0.77,
+0.78), so the upward launch is the Axe Swing's (the sheet's upward move),
+its heft lengthened to 0.6 s and its reach before her cut to 60. Details
+in [#0018's specification](docs/characters/0018.md#balance).
+
+**Where to tune it.** Every value of hers is in
+`js/data/characters/0018.js`: the moves' phases are whole frames of their
+clips at `FPS_0018` (the orders `KITCHEN_KNIFE_0018`, `STALKER_LUNGE_0018`,
+`FLASH_GRENADE_0018`, `DIARY_CAST_0018`, `AXE_CAST_0018` and the rest);
+reaches are the attacks' `hitbox`es; the lunge's run is `LUNGE_0018`, the
+dive's `DIVE_0018`, the backstab `BACKSTAB_0018`, the hop `HOP_0018`, the
+flash's hold `FLASH_0018`, the cloak `CLOAK_0018`, the axe's hit
+`AXE_0018` and its burst; the grenade's flight is the projectiles' `speed`
+and `arc`; the anchors `ANCHORS_0018`.
+
+**Code:** `js/game/combat/projectile.js` (the `arc` field,
+`projectileLaunchVy`, `projectileDrop`, a projectile's `vy`),
+`js/game/combat/combat.js` (a gaze projectile seen from the side it comes
+from), the CPU (`cpu-intelligence/prediction.js`, `defense.js`,
+`perception.js`: the curve and a live shot's `vy`);
+`js/data/characters/0018.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0018.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, Energy, defense,
+launch, rendering, input, AI, testing, the served file and module
+counts).
+
+**Tests:** new `tests/systems/projectile-arc.test.mjs` (the field and what
+it refuses, the curve step for step and a straight shot unchanged, turned
+back still falling, the floor ending it, the CPU's prediction on the same
+curve, a gaze lob passing a turned back wherever it drops) and
+`tests/fighters/0018/fighter-0018.test.mjs` (registration and kit; her
+costs and cooldowns; her Specials; her Mash Combo; her names, touch
+buttons and controller layout; the 69 files, clean and tight, shared only
+across codenames, at one scale, anchored on her uniform; every move: the
+knife, the draw, the air katana, the lunge and its backstab, its block
+and its reach, the dive homing in and its backstab, the grenade's hop and
+curve, its flash holding a fighter facing it, passing a turned back and
+sailing over one too near, its block and its cooldown, the air grenade,
+the flash then the lunge into the back it cannot turn, the Diary's cloak,
+its broken cast, the Axe Swing either side, its block shoved back and its
+broken cast; her Deflect; the CPU playing her whole kit and landing its
+grenades; her source named nowhere); the roster-wide tables
+(`cooldown-policy`, `special-abilities`: twenty-nine Specials,
+`strict-combat-rules`, `mash-combo`, `projectile-spin`: her grenade's
+spin), `mimic` (a lobbed copy aimed where it comes down), `empty-roster`,
+`discover`, `practice-ground`, `watch-mode`, `settings` (her credit,
+eighteen linked lines) and each fighter's roster list.
+
+**Checked in the browser** (headless Chromium, the real game): a Quick
+Battle as #0018 against #0007, #0001 and #0003 on Desert and City with no
+console error; her clips at the roster's scale and anchored on her body;
+her moves played (the knife, the draw, the lunge stretched out along the
+floor, the grenade lobbed from her hop and its flash holding #0007 and
+#0001, the Diary's shimmer, the axe striking at its release, the Air
+Katana, the dive and the flying knee); her portrait and her ability HUD.
+The itch.io release builds (14 files) and plays all 60 equivalence
+scenarios exactly as the source.

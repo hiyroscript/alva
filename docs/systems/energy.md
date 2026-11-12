@@ -87,6 +87,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0015 | the Gift and the Air Gift (attack3: its present, a projectile that never moves), the Pink Typhoon and the Air Pink Typhoon (attack4: its tornadoes) | — |
 | #0016 | the Twin Pistols and the Air Twin Pistols (attack2: a volley of shots, 15 for the whole volley), the Silent Arrow (attack3, a technique: her arrow) | the Medipack (3 s) |
 | #0017 | — (nothing of her own creates anything; every copy she throws with Finders Keepers is an ordinary construct, 15 for each throw) | the Earth Chop (5 s); a copy she throws that holds (3 s) or deals 10 (5 s) |
+| #0018 | — (her one projectile, the grenade, has its 3 s instead) | the Flash Grenade and the Air Flash Grenade (3 s), the Diary (3 s), the Axe Swing (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
@@ -105,7 +106,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008,
-#0009, #0010, #0011, #0012, #0013, #0014, #0015, #0016 and #0017 leave it out (12). Nothing
+#0009, #0010, #0011, #0012, #0013, #0014, #0015, #0016, #0017 and #0018 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than

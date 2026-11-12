@@ -122,7 +122,7 @@ behave, and how it must look.
   `assets/characters/0004/`, `assets/characters/0005/`,
   `assets/characters/0006/` (its three members' frames),
   `assets/characters/0007/`, `assets/characters/0008/`,
-  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/`, `assets/characters/0013/`, `assets/characters/0014/`, `assets/characters/0015/`, `assets/characters/0016/` and `assets/characters/0017/` are the only fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/`, `assets/characters/0013/`, `assets/characters/0014/`, `assets/characters/0015/`, `assets/characters/0016/`, `assets/characters/0017/` and `assets/characters/0018/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -159,8 +159,8 @@ behave, and how it must look.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
   never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
-  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's, #0015's, #0016's and #0017's art faces right; #0001's three orbs, #0004's note,
-  #0005's balloons, #0007's molotov fire, #0010's meeting call, #0012's shuriken, #0014's explosion, #0015's present and tornadoes and #0016's pistol shots are direction-neutral; #0016's arrow faces right; #0017 has no projectile art of her own: a copy she throws is drawn in its own fighter's art.)
+  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's, #0015's, #0016's, #0017's and #0018's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons, #0007's molotov fire, #0010's meeting call, #0012's shuriken, #0014's explosion, #0015's present and tornadoes and #0016's pistol shots are direction-neutral; #0016's arrow faces right; #0017 has no projectile art of her own: a copy she throws is drawn in its own fighter's art; #0018's grenade faces right.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -171,7 +171,7 @@ behave, and how it must look.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
   artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
-  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's, #0015's, #0016's, #0017's or any later fighter's). Do not download
+  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's, #0015's, #0016's, #0017's, #0018's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -856,7 +856,7 @@ a **Perquisite** to pick every five levels. Explained in
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
   slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09,
-  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12, `#0013` in slot 13, `#0014` in slot 14, `#0015` in slot 15, `#0016` in slot 16 and `#0017` in slot 17; the other 31 are locked. A fighter that is not
+  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12, `#0013` in slot 13, `#0014` in slot 14, `#0015` in slot 15, `#0016` in slot 16, `#0017` in slot 17 and `#0018` in slot 18; the other 30 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -1300,6 +1300,9 @@ neither player learns the other's address.
     Spriters Resource, the line linked to the sheet's page (by the asset's
     number: the address names the game the sheet comes from, never the
     character).
+  - **#0018 sprite source** — sprite sheet by xmaygrrr on DeviantArt, the
+    line linked to the sheet's page (by the deviation's number alone, so
+    the address names nothing).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -1312,9 +1315,9 @@ neither player learns the other's address.
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
   #0005, #0006, #0007, #0008, #0009, #0010, #0011, #0012, #0013, #0014,
-  #0015, #0016 or #0017 (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
+  #0015, #0016, #0017 or #0018 (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
   `#0005` / `#0006` / `#0007` / `#0008` / `#0009` / `#0010` / `#0011` /
-  `#0012` / `#0013` / `#0014` / `#0015` / `#0016` / `#0017` in
+  `#0012` / `#0013` / `#0014` / `#0015` / `#0016` / `#0017` / `#0018` in
   game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
@@ -1981,7 +1984,8 @@ English and French.
   #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin
   Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift
   and Air Gift, #0016's Medipack, #0017's Earth Chop, Finders Keepers
-  and Air Finders Keepers, marked Ground or Air;
+  and Air Finders Keepers, #0018's Diary and Axe Swing, marked Ground or
+  Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -2434,13 +2438,13 @@ each fighter's own values are in its character specification (7.2.9).
   `js/data/characters.js`) holds ten definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
   `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`,
-  `0010.js`, `0011.js`, `0012.js`, `0013.js`, `0014.js`, `0015.js`, `0016.js`, `0017.js`): `#0001` in roster slot 01, `#0002` in
+  `0010.js`, `0011.js`, `0012.js`, `0013.js`, `0014.js`, `0015.js`, `0016.js`, `0017.js`, `0018.js`): `#0001` in roster slot 01, `#0002` in
   slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05,
   `#0006` in slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in
   slot 09, `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12,
   `#0013` in slot 13, `#0014` in slot 14, `#0015` in slot 15, `#0016` in
-  slot 16 and `#0017` in slot 17, each fully implemented (7.2.9) and playable: `available: true`.
-  All seventeen are
+  slot 16, `#0017` in slot 17 and `#0018` in slot 18, each fully implemented (7.2.9) and playable: `available: true`.
+  All eighteen are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -2634,6 +2638,13 @@ each fighter's own values are in its character specification (7.2.9).
   Finders Keepers, a `mimic`) are ordinary attacks, `attack4` (the Earth
   Chop) a technique, and `extra_attack` is her Stick Poke, on the ground
   only (the sheet draws it standing).
+  #0018 has five: `attack1` (the Kitchen Knife; `midair_attack1`, the Air
+  Katana), `attack2` (the Stalker's Lunge; `midair_attack2`, the Stalker's
+  Dive, each with a `backstab`) and `attack3` (the Flash Grenade;
+  `midair_attack3`, the Air Flash Grenade, a lobbed projectile: `arc`) are
+  ordinary attacks, `attack4` (the Diary, a cloak) and `attack5` (the Axe
+  Swing) techniques, and `extra_attack` is her Katana Draw, on the ground
+  only (the sheet draws it standing).
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -2650,8 +2661,8 @@ each fighter's own values are in its character specification (7.2.9).
   Emergency Meeting; #0011: Camouflage and the Venom Punch; #0012:
   Dragonblade; #0013: the Twin Lion Fists and the Sixty-Four Palms; #0014:
   the Sunburst Fist; #0015: the Gift and the Air Gift; #0016: the Medipack;
-  #0017: the Earth Chop, Finders Keepers and the Air Finders Keepers:
-  twenty-seven across the roster. Red, Maximum Blue, the
+  #0017: the Earth Chop, Finders Keepers and the Air Finders Keepers;
+  #0018: the Diary and the Axe Swing: twenty-nine across the roster. Red, Maximum Blue, the
   Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat
   Vision, the Sonic Scream, the Triple Strike, the Molotov Cocktail, the
   Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum Rocket, the Air
@@ -2659,8 +2670,8 @@ each fighter's own values are in its character specification (7.2.9).
   Lines, the Venom Jump, Shuriken, the Deflect Stance, Swift Strike, the
   Rising Strike, the Protective Palms, Meteodrive, Meteor Strike,
   Waterkick, the Pink Typhoon, the Girl Dunk, the Twin Pistols, the Silent
-  Arrow, the Grapple, Kiiin!, the Headbutt Dive and the Rocket Headbutt are
-  ordinary. The
+  Arrow, the Grapple, Kiiin!, the Headbutt Dive, the Rocket Headbutt, the
+  Flash Grenade, the Stalker's Lunge and the Stalker's Dive are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -3133,8 +3144,10 @@ each fighter's own values are in its character specification (7.2.9).
     Sixty-Four Palms 5 s (its 10-damage flurry), #0014 Sunburst Fist 5 s (its
     10-damage punch), #0016 the Medipack 3 s (its heal), #0017 the Earth
     Chop 5 s (its 10-damage quake; a copy Finders Keepers throws earns what
-    the copy does: 5 s for a 10-damage one, 3 s for one that holds); every
-    other move of the seventeen, Red,
+    the copy does: 5 s for a 10-damage one, 3 s for one that holds), #0018
+    the Flash Grenade and the Air Flash Grenade 3 s (their flash's hold),
+    the Diary 3 s (its cloak) and the Axe Swing 5 s (its 10-damage swing);
+    every other move of the eighteen, Red,
     Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of Pain,
     the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the Sonic
     Scream, the Molotov Cocktail, the Sawn-Offs, #0008's Gatling (8 at the
@@ -3152,7 +3165,9 @@ each fighter's own values are in its character specification (7.2.9).
     adding up to 4), Silent Arrow (its backstab's 5 is no 10) and Grapple
     (a lift that pulls), and #0017's touch (a mimic: routine), Kiiin! (a
     roll), Headbutt Dive (a slam whose impact is a quake) and Rocket
-    Headbutt (a lift that carries) included, none at all (the ordinary ones
+    Headbutt (a lift that carries), and #0018's Stalker's Lunge (a roll) and
+    Stalker's Dive (a homing dash), their backstab's 5 no 10, included, none
+    at all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -3594,6 +3609,16 @@ each fighter's own values are in its character specification (7.2.9).
     never a Mash Combo partner; the CPU values a touch by what it would
     take and reads a held copy as its throw; a mark over the fighter shows
     the copy it holds (7.3). #0017's Finders Keepers.
+  - **Lobbed projectiles** (`arc: { lift, gravity }` on a projectile, null
+    by default: it flies straight): it leaves going up at `lift` (0 or
+    more) and falls at its own `gravity` (above 0), its `speed` (required)
+    still carrying it the way it was thrown, exactly along
+    `projectileDrop`'s curve, the one the CPU predicts it on; it rises and
+    comes down ahead of its thrower, over whoever is too near, the floor
+    ending it as any solid ends any shot; turned back, it keeps falling
+    where it was. A gaze projectile is seen, or not, from the side it comes
+    from, the way it travels, wherever over the fighter it happens to be.
+    #0018's Flash Grenade.
   - **Piercing projectiles** (`pierce: { hits, interval }`): strike up to
     `hits` times, at least `interval` seconds apart, staying in play between
     them; the last resolves as the projectile's `finisher` (its own damage
@@ -4124,7 +4149,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Typhoon (its tornadoes) and #0016 the Twin Pistols and the Air Twin
   Pistols (a volley of shots: one 15 for the whole volley) and the Silent
   Arrow (her arrow, a projectile), and every ordinary copy #0017's Finders
-  Keepers throws (a projectile it copied, 15 for each throw). One
+  Keepers throws (a projectile it copied, 15 for each throw); #0018 none
+  (its one projectile, the Flash Grenade's grenade, has its 3 s). One
   activation pays once: never per projectile update, per hit (a piercing
   orb's several strikes), per shot of a volley (#0012's three shuriken:
   one 15), per frame a construct lives, per clone strike,
@@ -4134,7 +4160,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12, #0014 12, #0015 12, #0016 12, #0017 12). The maximum and every
+  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12, #0014 12, #0015 12, #0016 12, #0017 12, #0018 12). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -4214,7 +4240,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   and the Twin Lion Fists none (15 Energy), #0014 Sunburst Fist 5 s (its
   10-damage punch) and Waterkick none (15 Energy), #0016 the Medipack 3 s
   (its heal) and the Silent Arrow none (15 Energy), #0017 the Earth Chop 5 s
-  (its 10-damage quake), with cast/release timing,
+  (its 10-damage quake), #0018 the Diary 3 s (its cloak) and the Axe Swing
+  5 s (its 10-damage swing), with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from attacks' cooldowns in
@@ -4381,7 +4408,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   below; docs/characters/0014.md), and #0016's Silent Arrow (a projectile,
   her arrow, with a backstab) and Medipack (a heal, docs/characters/0016.md),
   and #0017's Earth Chop (a 10-damage burst round her, a quake,
-  docs/characters/0017.md); a
+  docs/characters/0017.md), and #0018's Diary (a cloak) and Axe Swing (a
+  10-damage burst that shoves a guard back, docs/characters/0018.md); a
   technique of another shape would be a new
   form in the runtime, not a new reading of these fields. The CPU reads a
   technique's lead (its cast), where it lands (its burst's box, its
@@ -5201,6 +5229,18 @@ there, and nothing in one is a rule for another fighter.
   all the Energy of one that throws nothing, for herself; both fists
   raised for her guard and a hop and a shout for her Deflect; no shot of
   her own).
+- **#0018**: [docs/characters/0018.md](docs/characters/0018.md) (the
+  devoted stalker in a sailor uniform: the Kitchen Knife and the Katana
+  Draw up close, her Mash Combo; the Air Katana in the air;
+  the Stalker's Lunge, low along the ground (`motion: roll`), and the
+  Stalker's Dive, at her prey from mid-air (`motion: homing`), each far
+  harder in a turned back (`backstab`); the Flash Grenade, on the ground
+  from a hop and in the air, lobbed (`arc`, a capability any fighter may
+  now use), its flash holding still whoever it reaches facing it
+  (`paralyze`, a `gaze`); the Diary, a technique and her Special, out of
+  sight (`cloak`); and the Axe Swing, her Special, a technique, 10 that
+  sends its target sky-high and shoves a raised guard back (`blockPush`); her katana held up for her
+  guard and a flying knee for her Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -5218,7 +5258,7 @@ or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
 #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5,
 #0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5, #0015 3/5,
-#0016 3/5, #0017 5/5.
+#0016 3/5, #0017 5/5, #0018 4/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -5280,7 +5320,8 @@ Adding one is described in
   Emergency Meeting 3 s, #0011 Camouflage 3 s and Venom Punch 3 s, #0012
   Dragonblade 5 s, #0013 Sixty-Four Palms 5 s, #0014 Sunburst Fist 5 s,
   #0016 Medipack 3 s, #0017 Earth Chop 5 s, and Finders Keepers its copy's
-  3 s or 5 s once thrown). The fighter the
+  3 s or 5 s once thrown, #0018 Flash Grenade and Air Flash Grenade 3 s,
+  Diary 3 s and Axe Swing 5 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -5405,7 +5446,10 @@ Adding one is described in
     Sweep, air the Air Kick, the Air Twin Pistols and the Grapple; #0017:
     ground the Spin Kick, Kiiin!, the Rocket Headbutt, the Earth Chop,
     Finders Keepers and the Stick Poke, air the Somersault Headbutt, the
-    Headbutt Dive, the Air Rocket Headbutt and the Air Finders Keepers.
+    Headbutt Dive, the Air Rocket Headbutt and the Air Finders Keepers;
+    #0018: ground the Kitchen Knife, the Stalker's Lunge, the Flash
+    Grenade, the Diary, the Axe Swing and the Katana Draw, air the Air
+    Katana, the Stalker's Dive and the Air Flash Grenade.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -5709,7 +5753,10 @@ Adding one is described in
   only); for #0017, I is Kiiin! (the Headbutt Dive in the air), O the Rocket
   Headbutt (the Air Rocket Headbutt in the air), M the Earth Chop, `,`
   Finders Keepers (the Air Finders Keepers in the air) and J the Stick Poke
-  (on the ground only). The
+  (on the ground only); for #0018, U is the Kitchen Knife (the Air Katana
+  in the air), I the Stalker's Lunge (the Stalker's Dive in the air), O the
+  Flash Grenade (the Air Flash Grenade in the air), M the Diary, `,` the Axe
+  Swing and J the Katana Draw (on the ground only). The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -5941,8 +5988,9 @@ Adding one is described in
   in slot 3, Waterkick in slot 4 and the Sunburst Fist in slot 5), 4 for
   #0015 (the Gift in slot 3 and the Pink Typhoon in slot 4), 5 for #0016
   (the Silent Arrow in slot 3, the Flip Kick in slot 4 and the Medipack in
-  slot 5) and 5 for #0017 (the Rocket Headbutt in slot 3, the Earth Chop in
-  slot 4 and Finders Keepers in slot 5). A summon or technique button is
+  slot 5), 5 for #0017 (the Rocket Headbutt in slot 3, the Earth Chop in
+  slot 4 and Finders Keepers in slot 5) and 5 for #0018 (the Flash Grenade
+  in slot 3, the Diary in slot 4 and the Axe Swing in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -6282,7 +6330,11 @@ codename is sent, never what an action does.
   Spin Kick Square, Stick Poke Triangle, Finders Keepers R2, Kiiin! the
   right stick forward, Rocket Headbutt the right stick up, Earth Chop L2;
   in the air Somersault Headbutt Square, Air Finders Keepers R2, Headbutt
-  Dive the right stick down, Air Rocket Headbutt the right stick up. A
+  Dive the right stick down, Air Rocket Headbutt the right stick up. #0018:
+  Kitchen Knife Square, Katana Draw Triangle, Axe Swing Circle, Flash
+  Grenade R2, Stalker's Lunge the right stick forward, Diary L2; in the air
+  Air Katana Square, Air Flash Grenade R2, Stalker's Dive the right stick
+  forward. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter

@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Seventeen playable fighters** on a 48-slot roster:
+- **Eighteen playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -139,10 +139,16 @@ blocks every attack.
   for herself; the Earth Chop, a punch that splits the ground round her;
   Kiiin!, a run at the speed of sound; headbutts forward, up and straight
   down into the ground, which bursts where she lands; a spinning kick and
-  a stick she pokes things with).
-  All seventeen Shield
+  a stick she pokes things with),
+  [#0018](docs/characters/0018.md), the devoted stalker in a sailor
+  uniform (her diary, after which she slips out of her prey's sight; a
+  knife lunge on the ground and a dive from the air that land far harder
+  in a turned back; a flash grenade lobbed in an arc that holds still
+  whoever looks at it; a katana drawn in one cut; an axe swung up through
+  a raised guard).
+  All eighteen Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all seventeen Dash on the ground and air dash. Each fighter
+  back at their thrower), and all eighteen Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
@@ -151,7 +157,8 @@ blocks every attack.
   and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's
   Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's
   Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack, #0017's
-  Earth Chop, Finders Keepers and Air Finders Keepers): an orange
+  Earth Chop, Finders Keepers and Air Finders Keepers, #0018's Diary and
+  Axe Swing): an orange
   exclamation
   mark floats over
   a fighter while it performs one.
@@ -262,7 +269,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,986):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 2,059):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -445,6 +452,9 @@ the sheet's own credit: original sprites by SEGA and Sonic Team.
 
 **#0017 sprite source.** Sprite sheet ripped by Dazz & Fret on
 [The Spriters Resource](https://www.spriters-resource.com/ds_dsi/jus/asset/2032/).
+
+**#0018 sprite source.** Sprite sheet by xmaygrrr on
+[DeviantArt](https://www.deviantart.com/xmaygrrr/art/748406504).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related
