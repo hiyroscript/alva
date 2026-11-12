@@ -1,10 +1,14 @@
 # Audio
 
 Alva's sound (the **Sound update**): a theme for each battle stage in five
-versions, Practice Ground's factory ambience, and seven sound effects. Nothing
-else: no menu, hit, jump, footstep, announcer, click, countdown, Energy,
-hazard or character sound, and no menu or title theme. The menus' old
-`play('move')` calls stay silent.
+versions, Practice Ground's factory ambience, and eleven sound effects: the
+Sound update's seven, and four the owner added with the match entrance
+([battle](../gameplay/battle.md#the-matchs-entrance)): the spawn, the
+bolt's strike, the bolt covering the screen and the reveal. Nothing else:
+no menu, hit, jump, footstep, announcer, click, countdown, Energy, hazard
+or character sound, and no menu or title theme. The menus' old
+`play('move')` calls stay silent. The list is closed: only the owner adds
+to it, as with the entrance's four.
 
 | Kind | Sound | Where it plays |
 | --- | --- | --- |
@@ -21,6 +25,10 @@ hazard or character sound, and no menu or title theme. The menus' old
 | 10 | **Perfect Shield** | A perfect block, in place of the block's sound |
 | 11 | **Shield block** | An ordinary blocked hit |
 | 12 | **Shield hold** | A loop while a Shield is up |
+| 13 | **Spawn** (`sfx.spawn`) | A fighter appearing as its spawn burst pops: every Void respawn (Practice Ground's too, as its ejections play there) and both of a match entrance's spawns |
+| 14 | **Bolt strike** (`sfx.boltStrike`) | The match entrance's bolt striking, at its contact |
+| 15 | **Bolt cover** (`sfx.boltCover`) | The bolt striking again and covering the screen, peaking at full cover |
+| 16 | **Reveal** (`sfx.entranceReveal`) | The cover clearing to the stage, leading into the stage's theme |
 
 ## Route A: composed in code, synthesized live
 
@@ -61,7 +69,7 @@ effects ───── (small room) ──────────────�
 | Module | Owns |
 | --- | --- |
 | [`js/core/audio-manager.js`](../../js/core/audio-manager.js) | `AudioManager` (the app's `audio`): the context and its unlock, the buses, the levels (Settings › Audio, live), the director's changes carried out, the effects and their limits, the Shield hums, the ambience, pause, mute and the page's visibility. |
-| [`js/core/audio/sounds.js`](../../js/core/audio/sounds.js) | The only sounds Alva has (`ALLOWED_SOUNDS`, 33 ids of the twelve kinds) and `SoundRegistry`, which refuses anything else. |
+| [`js/core/audio/sounds.js`](../../js/core/audio/sounds.js) | The only sounds Alva has (`ALLOWED_SOUNDS`, 37 ids of the sixteen kinds) and `SoundRegistry`, which refuses anything else. |
 | [`js/core/audio/perspective.js`](../../js/core/audio/perspective.js) | `audioPerspective(mode)`: whose point of view decides the ejection and ending sounds. |
 | [`js/core/audio/director.js`](../../js/core/audio/director.js) | `MusicDirector`: the version state machine (`idle → battle → overtime → postVictory \| postDefeat \| postDraw`), overtime's intensity, the quantize and fade of each change. |
 | [`js/core/audio/sequencer.js`](../../js/core/audio/sequencer.js) | `compileTheme`, `renderBar` (a bar's notes from a theme's data), `MusicVoice` (one version playing: its channels, the sidechain pump, its faders). |
@@ -80,12 +88,15 @@ screen (and Online Play's on top of it) and Practice Ground:
 
 | Event | From |
 | --- | --- |
-| `battleStarted(stage, mode, { localSlot })` | The battle built (Quick Battle, Adventure, Watch Mode, Local Play, Online Play) |
+| `battleStarted(stage, mode, { localSlot })` | The battle built (Quick Battle, Adventure, Watch Mode, Local Play, Online Play); with a match entrance, its reveal (the `entranceReveal` cue), so the theme starts as the stage appears |
+| `entranceStarted()` | A match entrance beginning (the battle attached in its entrance, or `Battle.restart` into one): the music fades out as leaving does and waits for the reveal |
+| `entranceBolt()` / `entranceCover()` / `entranceReveal(stage)` | The entrance's `entranceBolt`, `entranceCover` and `entranceReveal` cues (`Battle.stepEntrance`), each once, at its step's start: on the simulation clock, so a pause holds them |
+| `fighterSpawned(fighter)` | The `spawned` cue: `Arena.updateRespawns` as a fighter is back, and a match entrance's spawns, as the burst pops |
 | `practiceStarted()` | Practice Ground's session built |
 | `overtimeStarted()` | `Battle.startOvertime` (the Arena's `overtime` cue) |
 | `overtimePressure(p)` | Every frame the world ran: `Battle.overtimeVoidPressure`, never a clock of its own |
 | `matchEnded(winner)` | `Battle.finishMatch` (`matchEnded` cue), once |
-| `restarted()` | `Battle.restart` (Restart, Rematch) |
+| `restarted()` | `Battle.restart` (Restart, Rematch) of a battle with no entrance (a battle screen's always has one: `entranceStarted`) |
 | `fighterEjected(fighter)` | `Arena.checkVoid` and `Battle.ejectLoser`, where `HitEffects.addElimination` fires: once per exit |
 | `deflected(fighter, { direction })` | `CombatSystem.deflectProjectiles`, the first projectile a Deflect turns back (its `first` record, where its 15 Energy is paid) |
 | `blocked(fighter, { perfect })` | Each `block` event of the step, a perfect one marked |
@@ -128,7 +139,10 @@ One music bus, one active voice. The director's state machine:
   The sting then flows into its calm loop, under the celebration and the
   Match Results, until the player leaves.
 - **Restart, Rematch**: the old version fades in 0.25 s, then the Main
-  Battle starts clean from its intro, overtime's intensity back to 0.
+  Battle starts clean from its intro, overtime's intensity back to 0. On a
+  battle screen every match has its entrance: the old version fades out as
+  the bolt strikes (as leaving does, 0.6 s), nothing plays under the versus
+  screen, and the Main Battle starts from its intro with the reveal.
 - **Pause**: the bed (music and ambience) ducks about 10 dB under a 900 Hz
   low-pass, the Shield hums hold, overtime's intensity stays where it is;
   resume restores them.
@@ -163,6 +177,30 @@ two copies of one effect play at once (`SFX_LIMITS.perSound`) and ten in all.
 - **Shield hold**: a low, soft hum wavering like the Shield's circle, in
   over about 80 ms, out over about 120 ms, one per fighter, held silent while
   paused.
+
+The match entrance's four are one family on A and E: the strike hums on A,
+the cover's line rises a fifth from A to E at full cover, and the reveal
+leaves that E for the stage's own tonic (`revealRoot`: its theme's `tonic`,
+between A3 and A4), so each leads into the next and the last into the
+stage's music.
+
+- **Spawn**: cued as the fighter appears, on the burst's pop: a bright,
+  punchy pop and a soft low thump at once, then a shimmer on A and E rising
+  a fifth into place and a sparkly tail, about 0.4 s. Its pitch varies a
+  quarter as much as the other effects' (±1 %); the same for every fighter.
+  The burst's own closing-in is the visual swell before the pop: a sound
+  swelling before it would have to start before its cue, so it would sound
+  through a pause or ahead of a stalled online step.
+- **Bolt strike**: a sharp electric crack exactly at contact, a few snaps of
+  crackle and a short sizzle over a low thud, then a quiet hum (detuned
+  saws on A2 and E3 through a fluttering low-pass) under the bolt's
+  flicker, gone by the time the black has faded in.
+- **Bolt cover**: a bigger, brighter crack, a roar of noise swelling open
+  (spread left and right) with the glow's bloom while a low line rises from
+  A to E, both peaking at full cover (0.28 s), then letting go.
+- **Reveal**: an airy whoosh falling away and a soft reverse swell gliding
+  up a tone into the stage's tonic with its fifth and octave, resolving as
+  the green clears; the stage's Main Battle starts under it.
 
 ### Practice Ground's ambience
 
@@ -232,6 +270,16 @@ settings, after the master's compressor and limiter:
 | Deflect, Perfect Shield | peaks about -13 to -15 dB, the Perfect Shield above the block |
 | Shield block | about -16 dB |
 | Shield held | about -30 dB, well under the music |
+| Bolt cover, bolt strike | about -11 and -12 dB: a little over the Deflect and the Perfect Shield, under the ejections |
+| Spawn | about -17 dB, with the block: under the ejections |
+| Reveal | about -22 dB, soft, at the music's level |
+
+The match entrance's four were levelled against the effects already there
+the same way: each rendered alone in an `OfflineAudioContext` through the
+engine's own effects bus, small room, glue compressor and limiter at the
+default settings, its loudest 50 ms compared (measured so, the ejections
+come out at about -9 dB, the Deflect and the Perfect Shield -12 to -13, the
+block -17).
 
 Every render was free of clicks and gaps, every change of version landed on
 its beat, and each Main Battle's loop came round with no seam. A new theme

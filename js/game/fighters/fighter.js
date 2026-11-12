@@ -229,6 +229,12 @@ export class Fighter {
     // it went the same way, and for the same rest of the match.
     this.ejected = false;
     this.respawnTimer = null;
+    // Out of play until its match's entrance has it appear (a Battle built
+    // with its entrance, js/game/entrance.js, sets it as the match starts):
+    // not updated, drawn, hit or framed, and nothing of the Void about it
+    // (no fall, ejection, statistic or ripple). A reset (a respawn
+    // included) puts it straight in play.
+    this.awaitingEntrance = false;
     // The fighter whose pull is drawing this one in, or drew it and still
     // carries it, helpless, toward it (see applyPulls in
     // js/game/combat/pull.js): it stops against that fighter rather than

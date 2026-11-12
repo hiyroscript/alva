@@ -776,6 +776,10 @@ test('Custom Play\'s Battle: two different fighters, Player 1 the player with th
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Palm Strike');
   assert.equal(screen.touch.buttons.get('attack2').getAttribute('aria-label'), 'Attack 2');
   assert.equal(screen.touchRoot.hidden, false);
+  // Play comes on as the match's entrance hands over to its intro, as it
+  // always did at a match's start.
+  assert.equal(app.input.gameplayActive, false, 'off through the entrance');
+  while (battle.phase === 'entrance') battle.update(1 / 60);
   assert.equal(app.input.gameplayActive, true);
   assert.deepEqual([battle.p1.automaticTurnAround, battle.p2.automaticTurnAround], [true, false], 'Automatic turn-around is Player 1\'s alone');
   screen.exit();

@@ -29,8 +29,10 @@
 // made. Without Web Audio the game is silent and plays exactly as ever.
 //
 // The game drives it by events (battleStarted, overtimeStarted,
-// overtimePressure, matchEnded, restarted, fighterEjected, deflected,
-// blocked, shieldHeld, paused, resumed, left, practiceStarted), through
+// overtimePressure, matchEnded, restarted, fighterEjected, fighterSpawned,
+// deflected, blocked, shieldHeld, paused, resumed, left, practiceStarted,
+// and a match entrance's entranceStarted, entranceBolt, entranceCover and
+// entranceReveal), through
 // BattleAudio (js/core/audio/battle-audio.js). It only listens: nothing here
 // is read by the simulation, its timing or Online Play's lockstep.
 
@@ -42,6 +44,7 @@ import { SampleBank } from './audio/instruments.js';
 import { SFX_RECIPES, ShieldHum } from './audio/sfx.js';
 import { FactoryAmbience } from './audio/ambience.js';
 import { THEMES } from './audio/themes/index.js';
+import { midiToFreq } from './audio/theory.js';
 import { DEFAULT_AUDIO, sanitizeAudio } from './settings.js';
 
 // The mix: each bus at full volume, the bed's ducks and the pause's
@@ -92,6 +95,17 @@ export function buildRegistry() {
     else registry.register(id, { kind: 'sfx', recipe: SFX_RECIPES[id] });
   }
   return registry;
+}
+
+// The pitch the entrance's reveal resolves onto for stage `stageId`: its
+// theme's tonic, between A3 and A4 (null for a stage with no theme).
+export function revealRoot(stageId) {
+  const tonic = THEMES[stageId]?.tonic;
+  if (!Number.isFinite(tonic)) return null;
+  let f = midiToFreq(tonic);
+  while (f < 220) f *= 2;
+  while (f >= 440) f /= 2;
+  return f;
 }
 
 // A settings slider (0-100) as a gain: squared, so the travel feels even.
@@ -457,6 +471,37 @@ export class AudioManager {
     return this.playSfx(ejectionSound(this.perspective, slot), { pan, duck: true });
   }
 
+  // `fighter` appeared, its spawn burst popping: back from the Void (or in
+  // Practice Ground) or brought on by a match's entrance. The same sound
+  // for every fighter.
+  fighterSpawned(fighter, { pan = 0 } = {}) {
+    return this.playSfx(SFX.spawn, { pan });
+  }
+
+  // A match's entrance begins (js/game/entrance.js): whatever music plays
+  // fades out, as leaving does, and the stage's theme waits for the
+  // entrance's reveal (battleStarted, then). The hums stop.
+  entranceStarted() {
+    this.stopHums();
+    this.transition(this.director.leave());
+  }
+
+  // The entrance's bolt strikes.
+  entranceBolt() {
+    return this.playSfx(SFX.boltStrike, { duck: true });
+  }
+
+  // The bolt strikes again and covers the screen.
+  entranceCover() {
+    return this.playSfx(SFX.boltCover, { duck: true });
+  }
+
+  // The cover clears to stage `stageId`: the reveal, resolving onto its
+  // theme's tonic (revealRoot).
+  entranceReveal(stageId = null) {
+    return this.playSfx(SFX.entranceReveal, { root: revealRoot(stageId) });
+  }
+
   // A Deflect turned a projectile back (once per Deflect), toward
   // `direction` (-1 left, 1 right).
   deflected(fighter, { pan = 0, direction = 1 } = {}) {
@@ -564,7 +609,7 @@ export class AudioManager {
   // Plays effect `id` (one of ALLOWED_SOUNDS' effects) now, within the
   // voice limits, varied a little; under it the bed ducks when `duck`.
   // Nothing is made while muted, silent or not yet unlocked.
-  playSfx(id, { pan = 0, direction = 1, duck = false } = {}) {
+  playSfx(id, { pan = 0, direction = 1, duck = false, root = null } = {}) {
     const entry = this.registry.get(id);
     if (entry?.kind !== 'sfx') return false;
     const ctx = this.ctx;
@@ -577,6 +622,7 @@ export class AudioManager {
     const t = now + 0.005;
     const end = entry.recipe(ctx, this.sfx, t, {
       pitch: vary(), level: vary(), pan: Math.max(-1, Math.min(1, pan)), direction: direction < 0 ? -1 : 1, reverb: this.sfxReverbIn,
+      root: root ?? undefined,
     }, this.bank);
     this.active.push({ id, end });
     if (duck) this.duckBed(t);

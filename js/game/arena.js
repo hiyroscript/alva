@@ -88,6 +88,8 @@ export class Arena {
     this.gravity = CONFIG.sim.gravity;
     this.step = CONFIG.sim.step;
     this.acc = 0;
+    // The last frame's share of the way between steps (see frame).
+    this.alpha = 0;
     // What feeds the fixed steps instead of the accumulator below (see
     // advance): an online match's lockstep, else nothing.
     this.stepper = null;
@@ -127,9 +129,12 @@ export class Arena {
   }
 
   // Tells the listener (if any) that `type` happened this step: 'ejected'
-  // ({ fighter }), 'deflected' (a deflection record), 'blocked' (a block
-  // event), and a Battle's 'overtime', 'matchEnded' ({ winner }) and
-  // 'restart'. Listening only: nothing the listener does is read back, it
+  // ({ fighter }), 'spawned' ({ fighter }: back from the Void as its spawn
+  // burst pops, see updateRespawns, or appearing in a match's entrance),
+  // 'deflected' (a deflection record), 'blocked' (a block event), and a
+  // Battle's 'overtime', 'matchEnded' ({ winner }), 'restart' and its
+  // entrance's 'entranceBolt', 'entranceCover' and 'entranceReveal' (see
+  // js/game/entrance.js). Listening only: nothing the listener does is read back, it
   // never runs when nobody listens, and a listener that throws never stops
   // the step, so sound can never change what a match does (Online Play's
   // lockstep, which runs every step exactly once and never rewinds, hears
@@ -151,18 +156,20 @@ export class Arena {
   }
 
   // The fighter the camera frames alongside Player 1, or null when Player 1
-  // is alone (see Camera.follow) or it has been lost to the Void.
+  // is alone (see Camera.follow) or it is out of play.
   get secondary() {
     const f = this.fighters[1];
-    return f && !f.lostToVoid ? f : null;
+    return f && !outOfPlay(f) ? f : null;
   }
 
   // The fighters still in play: every fighter, less any lost to the Void
-  // (see checkVoid) and still waiting to respawn. Only they update, collide,
-  // fight, are targeted and are drawn.
+  // (see checkVoid) and still waiting to respawn, and any still waiting to
+  // appear in a match's entrance (Fighter.awaitingEntrance). Only they
+  // update, collide, fight, are targeted and are drawn (no body, shadow,
+  // marker, status or trail for the others).
   get inPlay() {
     const all = this.fighters;
-    return all.some((f) => f.lostToVoid) ? all.filter((f) => !f.lostToVoid) : all;
+    return all.some(outOfPlay) ? all.filter((f) => !outOfPlay(f)) : all;
   }
 
   // Who the camera frames: the fighters in play, Player 1 first. While
@@ -216,6 +223,9 @@ export class Arena {
     // A lethal launch's slow motion feeds the fixed steps more slowly (see
     // HitEffects.timeScale); each step is still exactly one step.
     const alpha = this.advance(dt * this.fx.timeScale);
+    // How far between steps this frame is drawn (presentation reads it: a
+    // match entrance's timeline between its steps).
+    this.alpha = alpha;
     // Platforms and fighters drawn the same share of the way between steps,
     // so whoever stands on a moving platform stays on it on screen.
     this.stage.interpolate(alpha);
@@ -437,7 +447,8 @@ export class Arena {
   // backwards where it will appear (announceSpawn), once: the step the wait
   // crosses into that stretch. A fighter whose wait is over is back at its
   // own spawn (Fighter.respawn: 0 Launch Point, full Energy, every cooldown
-  // ready, nothing transient) and in play at once, as the burst pops.
+  // ready, nothing transient) and in play at once, as the burst pops, and
+  // cued ('spawned') for its sound.
   // Buffered presses
   // made while a player was out are dropped, so it comes back neutral: that
   // player's own (in Local Play the other player's are untouched).
@@ -450,6 +461,7 @@ export class Arena {
       if (before >= lead - 1e-9 && f.respawnTimer < lead - 1e-9) this.announceSpawn(f);
       if (f.respawnTimer > 1e-6) continue;
       f.respawn(this.stage);
+      this.cue('spawned', { fighter: f });
       if (f.controller?.kind !== 'player') continue;
       if (f.controller.flush) f.controller.flush();
       else this.input.flush();
@@ -1043,6 +1055,10 @@ export class Arena {
     this.stageHazards.reset();
   }
 }
+
+// Whether `f` is out of play: lost to the Void (and waiting to respawn, or
+// out for good), or still waiting to appear in its match's entrance.
+const outOfPlay = (f) => f.lostToVoid || f.awaitingEntrance;
 
 // Where body `b` crossed the Void's boundary `v` (the rectangle in force,
 // the one StageCollision.inVoid tests) this step: { side, x, y }, the point

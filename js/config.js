@@ -109,6 +109,60 @@ export const CONFIG = Object.freeze({
       maxWaveSpeedMultiplier: 6,
     },
     introSeconds: 1.7,
+    // The match's entrance (js/game/entrance.js), played before the intro
+    // at every match start of a screen's battle (Quick Battle, Adventure,
+    // Local Play, Watch Mode, Online Play; Restart and Rematch too), never
+    // on Practice Ground: the versus screen (the green bolt splitting the
+    // screen into Team I's half and Team II's, the black, both fighters
+    // sliding in), the bolt covering the screen and clearing to the empty
+    // stage, then the camera visiting each spawn as its fighter appears.
+    // Seconds on the simulation clock, so an online match plays it step for
+    // step on both browsers and starts its intro on the same step; the same
+    // with reduced motion (which changes only how each step looks). Every
+    // time below is from the start of the entrance.
+    entrance: Object.freeze({
+      // The bolt strikes down the middle (t = 0): drawn top to bottom over
+      // `boltDraw`, then a green-white flash of `flash` at contact.
+      boltDraw: 0.12,
+      flash: 0.1,
+      // The black fades in over the whole screen, the bolt kept over it.
+      blackStart: 0.25,
+      blackLength: 0.5,
+      // Team I slides down from above the top edge into the middle of the
+      // left half, then Team II up from below into the right half, each in
+      // `slideLength`.
+      teamISlide: 0.95,
+      teamIISlide: 1.25,
+      slideLength: 0.28,
+      // Both idle, the bolt flickering, until the bolt strikes again and
+      // covers the screen in `coverLength` (its glow blooming out from the
+      // centre line)...
+      cover: 3.5,
+      coverLength: 0.28,
+      // ...then the green clears to the stage (no fighter on it yet) over
+      // `revealLength`.
+      revealLength: 0.45,
+      // The camera holds the stage's centre until `firstZoom`, then for
+      // each team in turn (Team I first): it zooms in to `zoom` toward the
+      // team's spawn over `zoomLength`; the fighter appears exactly
+      // `appearAfterZoom` after the zoom arrives (its spawn burst starting
+      // HIT_FX.elimination.life before, so it pops as the fighter appears);
+      // a `beat`, then back to the centre over `backLength`.
+      firstZoom: 4.85,
+      zoomLength: 0.6,
+      appearAfterZoom: 0.5,
+      beat: 0.35,
+      backLength: 0.6,
+      // Held at the centre between Team I's return and Team II's zoom, and
+      // after Team II's return before the intro starts.
+      between: 0.25,
+      settle: 0.25,
+      // How far the camera closes in on a spawn: a pure 2D zoom of the
+      // picture (see js/game/rendering/screen-zoom.js), gentler with
+      // reduced motion.
+      zoom: 1.6,
+      reducedZoom: 1.25,
+    }),
     // First to this many points wins: a point for each time the opponent
     // falls into the Void. The HUD shows one score dot per point.
     pointsToWin: 3,

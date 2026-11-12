@@ -43,12 +43,13 @@ reads, what a fighter may leave out, and its tests.
   their editor, game controllers (PlayStation and Xbox: connections, the
   menu cursor, each fighter's controller layout and its editor).
 - [Rendering](systems/rendering.md): sprites, the camera, effects, the
-  status drawn with each fighter, and a fighter drawn as several members
-  (an ensemble).
+  status drawn with each fighter, a fighter drawn as several members
+  (an ensemble), and the match entrance (its versus screen, and the
+  screen-space zoom that never changes the stage's perspective).
 - [Audio](systems/audio.md): the Sound update's stage themes (five
-  versions each), Practice Ground's ambience, the seven effects, the
-  engine, whose point of view decides them, Settings › Audio, and adding a
-  stage's theme.
+  versions each), Practice Ground's ambience, the eleven effects (the
+  match entrance's four among them), the engine, whose point of view
+  decides them, Settings › Audio, and adding a stage's theme.
 - [Localization](systems/localization.md): English and French.
 
 ## Characters
@@ -61,7 +62,7 @@ reads, what a fighter may leave out, and its tests.
 
 - [Adventure](gameplay/adventure.md) (thirty levels, Venture, the
   Perquisites, saved progress)
-- [Quick Battle](gameplay/battle.md) (and difficulty)
+- [Quick Battle](gameplay/battle.md) (the match entrance, and difficulty)
 - [Watch Mode](gameplay/watch-mode.md)
 - [Local Play](gameplay/local-play.md) (two players, two controllers)
 - [Online Play](gameplay/online-play.md) (rooms, two browsers, delay-based

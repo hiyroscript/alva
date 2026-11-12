@@ -3,11 +3,17 @@
 // and tells the audio engine (js/core/audio-manager.js) what happened, in
 // the engine's words:
 //
-//   attach      battleStarted(stage, mode, { localSlot }) or practiceStarted()
+//   attach      battleStarted(stage, mode, { localSlot }) or practiceStarted();
+//               a battle in its entrance (js/game/entrance.js) waits for
+//               the entrance's reveal to start its music
 //   cues        the arena's own (Arena.cue): 'ejected' → fighterEjected,
-//               'deflected' → deflected, 'blocked' → blocked, 'overtime' →
-//               overtimeStarted, 'matchEnded' → matchEnded(winner),
-//               'restart' → restarted
+//               'spawned' → fighterSpawned, 'deflected' → deflected,
+//               'blocked' → blocked, 'overtime' → overtimeStarted,
+//               'matchEnded' → matchEnded(winner), 'restart' → restarted
+//               (or, into an entrance, entranceStarted), and the
+//               entrance's 'entranceBolt' → entranceBolt, 'entranceCover'
+//               → entranceCover, 'entranceReveal' → entranceReveal(stage)
+//               then battleStarted
 //   sync        every frame the world ran: overtimePressure(the battle's
 //               own Battle.overtimeVoidPressure; never a clock of its own),
 //               and each fighter's Shield raised or lowered (shieldHeld) and
@@ -35,6 +41,10 @@ export class BattleAudio {
     // Each fighter's Shield as last told to the engine: up or not.
     this.shields = new Map();
     this.pressure = -1;
+    // The battle's start as attach heard it ({ stage, mode, localSlot }),
+    // and whether its music waits for an entrance's reveal.
+    this.start = null;
+    this.awaitingReveal = false;
   }
 
   // Calls the engine's `name`, if it has one.
@@ -58,9 +68,18 @@ export class BattleAudio {
     this.mode = mode;
     this.pressure = -1;
     this.shields.clear();
+    this.start = { stage, mode, localSlot };
+    this.awaitingReveal = false;
     arena.cueListener = (type, detail) => this.onCue(type, detail);
     if (mode === 'practice') this.call('practiceStarted');
+    else if (arena.phase === 'entrance') this.waitForReveal();
     else this.call('battleStarted', stage, mode, { localSlot });
+  }
+
+  // A match's entrance: silence for the music until its reveal.
+  waitForReveal() {
+    this.awaitingReveal = true;
+    this.call('entranceStarted');
   }
 
   onCue(type, detail) {
@@ -87,8 +106,30 @@ export class BattleAudio {
       case 'restart':
         this.lowerAll();
         this.pressure = -1;
-        this.call('restarted');
+        if (this.arena?.phase === 'entrance') this.waitForReveal();
+        else this.call('restarted');
         break;
+      case 'spawned': {
+        const f = detail?.fighter;
+        this.call('fighterSpawned', f, { pan: this.panOf(f) });
+        break;
+      }
+      case 'entranceBolt':
+        this.call('entranceBolt');
+        break;
+      case 'entranceCover':
+        this.call('entranceCover');
+        break;
+      case 'entranceReveal': {
+        const start = this.start;
+        this.call('entranceReveal', start?.stage ?? null);
+        // The stage's theme from its intro, led in by the reveal.
+        if (this.awaitingReveal && start) {
+          this.awaitingReveal = false;
+          this.call('battleStarted', start.stage, start.mode, { localSlot: start.localSlot });
+        }
+        break;
+      }
       default:
         break;
     }
@@ -142,6 +183,8 @@ export class BattleAudio {
     this.lowerAll();
     this.arena = null;
     this.mode = null;
+    this.start = null;
+    this.awaitingReveal = false;
     this.call('left');
   }
 

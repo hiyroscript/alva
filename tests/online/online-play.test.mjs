@@ -471,7 +471,7 @@ test('the room: the guest arrives, both browsers connect, fighters and Ready; th
   assert.equal(battle.battle.mode, 'online');
   assert.equal(battle.battle.map.id, stageForSeed(start.seed).id, 'the stage drawn from the host\'s seed');
   assert.equal(battle.battle.map.id, other.battle.map.id, 'the same on both sides');
-  assert.equal(battle.revealName.textContent, `${battle.battle.map.name}`, 'the drawn stage shows over the intro');
+  assert.equal(battle.revealName.textContent, `${battle.battle.map.name}`, 'the drawn stage, shown over the intro');
   assert.equal(battle.localSlot, 'p1', 'the host plays p1');
   assert.equal(battle.battle.p1.label, 'Jules');
   assert.equal(battle.battle.p2.label, 'Sam');
@@ -480,10 +480,32 @@ test('the room: the guest arrives, both browsers connect, fighters and Ready; th
   assert.deepEqual(battle.battle.markerColors, CONFIG.online.colors);
   assert.ok(battle.el.classNames.has('is-online'));
   assert.equal(battle.touchRoot.hidden, false, 'touch controls for the local player');
-  for (let i = 0; i < 240; i++) booted.frame(other);
-  assert.ok(battle.lockstep.next > 200, `the match runs (${battle.lockstep.next} steps)`);
+  // The match's entrance first, steps of the match like any other: both
+  // browsers play it step for step and start the intro on the same step.
+  assert.equal(battle.battle.phase, 'entrance');
+  assert.equal(other.battle.phase, 'entrance');
+  assert.equal(battle.reveal.hidden, true, 'the drawn stage waits for the entrance\'s cover to clear');
+  const introStep = {};
+  const seen = { reveal: false, revealBeforeCover: false };
+  const DT = CONFIG.sim.step;
+  for (let i = 0; i < 1000 && !(battle.battle.phase === 'fight' && other.battle.phase === 'fight'); i++) {
+    booted.frame(other);
+    for (const [who, side] of [['host', battle], ['guest', other]]) {
+      const b = side.battle;
+      if (b.phase === 'intro' && !(who in introStep)) introStep[who] = side.lockstep.current - Math.round(b.phaseTime / DT);
+    }
+    const t = battle.battle.entranceTime;
+    if (!battle.reveal.hidden) {
+      seen.reveal = true;
+      if (t !== null && t < battle.battle.entrance.revealEnd) seen.revealBeforeCover = true;
+    }
+  }
+  assert.ok(Number.isInteger(introStep.host) && introStep.host > 500, `the intro after the entrance (step ${introStep.host})`);
+  assert.equal(introStep.host, introStep.guest, 'the same step on both browsers');
+  assert.ok(seen.reveal && !seen.revealBeforeCover, 'the drawn stage shown once the cover has cleared');
   assert.ok(Math.abs(battle.lockstep.next - other.lockstep.next) <= 4);
   assert.equal(battle.battle.phase, 'fight');
+  assert.equal(other.battle.phase, 'fight');
   assert.equal(battle.reveal.hidden, true, 'the stage name gone once the fight starts');
 });
 

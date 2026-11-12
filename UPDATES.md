@@ -7296,3 +7296,126 @@ striking: both fail without the lift) and
 `tests/fighters/0017/fighter-0017.test.mjs` (every shooter's copy thrown
 by #0017 on the ground and just off it flying and striking, its box clear
 of her feet).
+
+## The match entrance
+
+Not a named update (it can become one if the owner names it). Asked for in
+the `max` prompt, made on 2026-11-12: a presentation sequence before every
+match's intro on a battle screen, and four new sounds the owner added to
+the closed list for it.
+
+**What it adds.** Every match a battle screen starts (Quick Battle,
+Adventure, Local Play, Watch Mode, Online Play; Restart and Rematch, each a
+fresh match) now begins with its entrance; Practice Ground has none.
+
+- **Part A, the versus screen.** A green bolt, its shape drawn from the
+  match's seed, strikes down the middle (Team I's half left, Team II's
+  right), over the frame the player had (the loading screen's last look);
+  the black fades in under it; Team I's fighter slides down from above into
+  its half, Team II's up from below, each on its idle clip at about half
+  the screen's height, its side and name under it; they hold.
+- **Part B.** The bolt strikes again and its glow covers the screen; under
+  the cover the stage, empty; the cover clears from the centre outward.
+- **Part C.** The camera holds the stage's centre, zooms 1.6× toward Team
+  I's spawn, and 0.5 s after it arrives Team I's fighter appears with the
+  respawn's burst and the spawn's sound; back to the centre; the same for
+  Team II. The zoom is a pure 2D zoom of the picture (the strict rule
+  below).
+- **Then the intro**, unchanged, the HUD and the controls fading back in.
+
+It is the `Battle`'s own phase (`PHASES.entrance`, before `intro`, for a
+`Battle` built with `entrance`: every battle screen's), counted on the
+simulation clock while the world holds still (no clock, CPU, hazard,
+physics or respawn; inputs locked, flushed as it ends), so a pause holds
+it and Online Play's browsers play it step for step and start the intro on
+the same step. Both fighters wait off the stage (`awaitingEntrance`) until
+their step; the score, the statistics and the ejections never see it.
+Reduced motion keeps the same steps and times (no shake, overshoot or
+re-roll; the fighters fade in place; plain fades; a gentler 1.25× zoom).
+
+**The zoom is only a zoom (strict).** Through the entrance the view is a
+frozen lens (the home view), so the stages' one-point perspective,
+parallax and horizon never change; Part C's camera is one screen-space
+affine `{ k, ox, oy }` put in front of every `setTransform` on the battle
+canvas for the length of a render (`installScreenZoom` in
+`js/game/rendering/screen-zoom.js`), the framed region held inside the home
+frame and the spawn burst's shake nudging the zoom, never the lens. No
+offscreen buffer: everything is drawn at full resolution at the zoom, at
+no cost. Measured in Chromium on all five stages: the zoomed frame is the
+home frame scaled about the focus to within about 1/255 a channel on
+average (a zoom by moving the view: 15 to 22, a tenth of the pixels badly
+off). The lethal launch's zoom is unchanged; the same helper could carry
+it, and does not.
+
+**The four sounds** (`sfx.spawn` kind 13, `sfx.boltStrike` 14,
+`sfx.boltCover` 15, `sfx.entranceReveal` 16): the spawn on every spawn
+burst's pop (both entrance spawns and every Void respawn, Practice
+Ground's too, through the arena's new `spawned` cue), the bolt's strike,
+the bolt covering the screen and the reveal, each cued at its step's
+start; one family on A and E, the reveal resolving onto the stage's own
+tonic as its theme starts (the music now waits for the reveal: silence but
+for the bolt under the versus screen). Levelled against the existing
+effects in an `OfflineAudioContext` (loudest 50 ms): the cover -11 dB and
+the strike -12 (a little over the Deflect's and Perfect Shield's -12 to
+-13, under the ejections' -9), the spawn -17 (the block's), the reveal -22.
+The spawn's sound starts with its pop: its cue is the pop, so the shimmer
+the prompt put before the pop rises after it instead (a swell before it
+would have to start before its cue, sounding through a pause or ahead of
+a stalled online step).
+
+**Where to tune it.** Every time and the zoom: `CONFIG.battle.entrance` in
+`js/config.js` (the timeline, its steps and events derived in
+`js/game/entrance.js`). The versus screen's look: `ENTRANCE_LOOK` in
+`js/game/rendering/match-entrance.js`. The HUD's fade-in:
+`HUD_ARRIVAL_SECONDS` in `js/screens/battle-screen.js` (and its stylesheet
+twin in `css/battle-overlays.css`). The sounds: their recipes in
+`js/core/audio/sfx.js`.
+
+**Code:** `js/game/entrance.js`, `js/game/rendering/screen-zoom.js` and
+`js/game/rendering/match-entrance.js` (new); `js/game/battle.js` (the
+phase, `stepEntrance`, the held camera, the lens and the zoom, `render`),
+`js/game/arena.js` (`inPlay` leaving out a fighter still waiting, the
+`spawned` cue in `updateRespawns`, the frame's `alpha`),
+`js/game/fighters/fighter.js` (`awaitingEntrance`),
+`js/game/rendering/ensemble.js` (`idlePose` gives each part's
+`source` facing), `js/screens/battle-screen.js` and
+`js/screens/online-battle-screen.js` (the overlay, the loading hand-off,
+the HUD hidden and faded back in, pause, resize, restart, rematch,
+teardown; online, the drawn stage once the cover clears),
+`css/battle-overlays.css`, `js/core/audio/sounds.js`, `sfx.js`,
+`battle-audio.js` and `js/core/audio-manager.js`.
+
+**Tests:** new `tests/systems/match-entrance.test.mjs` (the timeline in
+order; nobody in play before their spawn, each fighter 0.5 s after its
+zoom arrives, the intro only once both stand there and the camera is
+home, the clock never moving, the presses flushed; the world held still;
+each entrance cue once at its step's start, the spawn bursts timed as a
+respawn's; the score, statistics and ejections untouched; Restart and
+Rematch replaying it; none without `entrance` nor on Practice Ground;
+reduced motion's same timeline; §5's invariant on every stage's
+projection through `Perspective.plane`, the screen identity and a parallax
+layer, the lens never moving, the zoom inside the home frame, the render
+drawn through it and the context given back; the home view the follow
+camera's own target on every stage; the spawn cue once per entrance spawn
+and per Void respawn, Practice Ground's included, heard as `sfx.spawn`;
+the music held for the reveal; the closed list's four and nothing else;
+the bolt's seeded shape and forks; the fighters' sizes on their real art,
+an ensemble's members; the versus screen drawn at every step and laid out
+again). Updated: `audio` (sixteen kinds, 37 sounds),
+`online-play` (both browsers start the intro on the same step, the drawn
+stage once the cover clears; the other player's headless Battle built
+with its entrance in `tests/helpers/online-app.mjs`), and `adventure`,
+`quick-battle`, `watch-mode` (the entrance before the intro's banner and
+before play comes on; a restart's fresh match in its entrance).
+
+**Checked in the browser** (Chromium, the real game, its clock stepped by
+hand): every step at 844 × 390 (twice the pixels) and at 1440 × 900 and
+1280 × 720, on every stage, with ordinary fighters and #0006's three
+sisters; reduced motion; the bolt over the loading screen's last look and
+its canvas back under the pause menu once the black is whole; a pause
+holding the timeline and a resize mid-sequence laying it out again where
+it was; Restart's bolt over the stage just left; the hand-off to the intro
+with the camera unmoved; leaving the screen with nothing left behind; no
+console error. The zoom compared with the home frame scaled about its
+focus on all five stages (above). Screenshots:
+[`docs/screenshots/match-entrance/`](./docs/screenshots/match-entrance/).

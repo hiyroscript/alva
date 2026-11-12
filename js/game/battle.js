@@ -49,6 +49,8 @@ import { overtimePressure } from './physics.js';
 import { resolveDifficulty } from '../data/difficulty.js';
 import { resolveModifiers, isIdentity } from './combat/modifiers.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
+import { entranceTimeline, entranceFraming } from './entrance.js';
+import { IDENTITY_ZOOM, framedZoom, nudgedZoom, withScreenZoom } from './rendering/screen-zoom.js';
 
 // Who plays each side, by mode, and the tag it is shown under (HUD cards,
 // markers). `stream` picks a CPU's randomness from the battle's seed (see
@@ -103,10 +105,14 @@ function sideModifiers(side, spec, slot) {
 // The match's periods: the normal clock, then (points level) overtime.
 export const PERIODS = Object.freeze({ regulation: 'regulation', overtime: 'overtime' });
 
-// The match's phases: its intro (nobody moves), the fight (the match is
-// live) and, once it is decided, the celebration (the world goes on, the
-// result stands).
-export const PHASES = Object.freeze({ intro: 'intro', fight: 'fight', celebration: 'celebration' });
+// The match's phases: its entrance (a battle screen's, see
+// js/game/entrance.js: the world holds still and the fighters appear one by
+// one), its intro (nobody moves), the fight (the match is live) and, once
+// it is decided, the celebration (the world goes on, the result stands).
+export const PHASES = Object.freeze({ entrance: 'entrance', intro: 'intro', fight: 'fight', celebration: 'celebration' });
+
+// Who the camera frames while it is held (the entrance): nobody.
+const NOBODY = Object.freeze([null, null]);
 
 // Each side's celebration randomness, a stream of the battle's seed of its
 // own ('cel1', 'cel2'), so a celebration never moves a CPU's combat
@@ -139,9 +145,14 @@ export class Battle extends Arena {
   // CPU's side never has any other: no difficulty and no mode scales what
   // a CPU's fighter does (a level is only how well it thinks), so anything
   // but the identity handed to one is refused.
+  //
+  // `entrance`: every match (the first, each restart and rematch) begins
+  // with the entrance (js/game/entrance.js) before its intro, as every
+  // battle screen's does; left out (headless matches: tests, benchmarks),
+  // a match starts on its intro with both fighters on their spawns.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    automaticTurnAround = true, labels = null, cpuLevel = null, modifiers = null,
+    automaticTurnAround = true, labels = null, cpuLevel = null, modifiers = null, entrance = false,
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.
@@ -189,6 +200,16 @@ export class Battle extends Arena {
     // its overtime's.
     this.roundSeconds = CONFIG.battle.matchSeconds;
     this.overtimeSeconds = CONFIG.battle.overtimeSeconds;
+    // The entrance's timeline (the same for every match of this battle, on
+    // both browsers of an online one), or null without one. `entranceNext`
+    // is its next event to act on; `matchIndex` counts the matches this
+    // battle has started (0 for the first), so each draws its own bolt.
+    this.entrance = entrance ? entranceTimeline() : null;
+    this.entranceNext = 0;
+    this.matchIndex = -1;
+    // The entrance camera's zoom this frame (js/game/rendering/
+    // screen-zoom.js), applied after projection; the identity otherwise.
+    this.screenZoom = IDENTITY_ZOOM;
 
     this.restart();
   }
@@ -204,12 +225,17 @@ export class Battle extends Arena {
     // match's result and statistics go.
     this.hazards.reset();
     this.stageHazards.reset();
+    // With an entrance, both wait off the stage for it to bring them on.
     for (const f of this.fighters) {
       const own = this.celebrations?.[f.slot];
       if (own && f.controller === own.celebration) f.controller = own.controller;
       f.reset(this.stage);
       f.controller?.reset?.();
+      f.awaitingEntrance = !!this.entrance;
     }
+    this.matchIndex += 1;
+    this.entranceNext = 0;
+    this.screenZoom = IDENTITY_ZOOM;
     this.final = null;
     this.celebrations = null;
     this.elapsed = 0;
@@ -226,20 +252,29 @@ export class Battle extends Arena {
     this.setVoidPressure(0);
     this.timeLeft = this.roundSeconds > 0 ? this.roundSeconds : Infinity;
     this.round = 1;
-    this.setPhase(PHASES.intro);
+    this.setPhase(this.entrance ? PHASES.entrance : PHASES.intro);
     this.input.flush();
-    if (this.view.pxW) this.camera.snap(this.p1, this.p2);
+    if (this.view.pxW) {
+      if (this.entrance) this.placeEntranceCamera();
+      else this.camera.snap(this.p1, this.p2);
+    }
     // The music starts over from its intro (heard only once a screen
-    // listens: never for the first match, built before it does).
+    // listens: never for the first match, built before it does; with an
+    // entrance, from its reveal).
     this.cue('restart');
   }
 
-  // Inputs are locked through the intro only: the fight and the
-  // celebration after it are both played.
+  // Inputs are locked through the entrance and the intro: the fight and
+  // the celebration after it are both played. Leaving the entrance, however
+  // it is left (its end, or a phase set over it), nobody is still waiting
+  // to appear.
   setPhase(phase) {
+    if (this.phase === PHASES.entrance && phase !== PHASES.entrance) {
+      for (const f of this.fighters) f.awaitingEntrance = false;
+    }
     this.phase = phase;
     this.phaseTime = 0;
-    const locked = phase === PHASES.intro;
+    const locked = phase === PHASES.intro || phase === PHASES.entrance;
     for (const f of this.fighters) f.inputLocked = locked;
     if (phase === PHASES.fight) this.input.flush();
     this.onPhase(phase, this);
@@ -291,6 +326,10 @@ export class Battle extends Arena {
   update(dt) {
     this.phaseTime += dt;
     switch (this.phase) {
+      case PHASES.entrance:
+        // The world holds still: only the entrance's own timeline runs.
+        this.stepEntrance(dt);
+        return;
       case PHASES.intro:
         if (this.phaseTime >= CONFIG.battle.introSeconds) this.setPhase(PHASES.fight);
         break;
@@ -317,6 +356,147 @@ export class Battle extends Arena {
     }
     if (live) this.stats.record(this);
     if (this.final && !this.final.stats) this.sealFinal();
+  }
+
+  // ---- The entrance (js/game/entrance.js) ---------------------------------------------
+
+  // One step of the entrance (its phaseTime already counted): every event
+  // due by now, once each and in order (a sound's cue at its step's start,
+  // a spawn burst, a fighter appearing), and the fighters already on the
+  // stage idling in place: their art only, since nothing else of the world
+  // steps (no clock, CPU, hazard, physics or respawn: none moves, slides,
+  // falls or turns). Its end starts the intro, with phaseTime 0 so the
+  // intro's banner keeps its timing, and drops every press buffered
+  // meanwhile.
+  stepEntrance(dt) {
+    const timeline = this.entrance;
+    const t = this.phaseTime;
+    while (this.entranceNext < timeline.events.length && timeline.events[this.entranceNext].time <= t + 1e-9) {
+      this.entranceEvent(timeline.events[this.entranceNext]);
+      this.entranceNext += 1;
+    }
+    for (const f of this.fighters) if (!f.awaitingEntrance) f.animator.update(dt, f.visualFacing);
+    if (t >= timeline.total - 1e-9) {
+      this.setPhase(PHASES.intro);
+      this.input.flush();
+    }
+  }
+
+  // One of the entrance's events: a sound's cue, a fighter's spawn burst
+  // (its elimination burst played backwards where it stands, as a
+  // respawn's: Arena.announceSpawn), or the fighter appearing as it pops:
+  // in play, fresh, its spawn's sound cued. Presentation and the fighters'
+  // presence only: no score, statistic, fall or ejection.
+  entranceEvent(event) {
+    const f = event.slot ? this[event.slot] : null;
+    switch (event.type) {
+      case 'bolt':
+        this.cue('entranceBolt');
+        break;
+      case 'cover':
+        this.cue('entranceCover');
+        break;
+      case 'reveal':
+        this.cue('entranceReveal');
+        break;
+      case 'burst':
+        if (f?.awaitingEntrance) this.announceSpawn(f);
+        break;
+      case 'appear':
+        if (!f?.awaitingEntrance) break;
+        f.awaitingEntrance = false;
+        this.cue('spawned', { fighter: f });
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Where the entrance is, in seconds on its timeline, drawn between its
+  // steps (the frame's share of the way to the next); null outside it.
+  get entranceTime() {
+    if (this.phase !== PHASES.entrance || !this.entrance) return null;
+    return Math.min(this.entrance.total, this.phaseTime + (this.alpha ?? 0) * this.step);
+  }
+
+  // The camera is held through the entrance: nobody to follow.
+  get cameraTargets() {
+    return this.phase === PHASES.entrance ? NOBODY : super.cameraTargets;
+  }
+
+  // Through the entrance, a resize lays the home view out again (see
+  // placeEntranceCamera), never restarting anything.
+  snapCamera() {
+    if (this.phase !== PHASES.entrance) {
+      super.snapCamera();
+      return;
+    }
+    if (!this.view.pxW) return;
+    this.placeEntranceCamera();
+    this.syncView();
+  }
+
+  // The entrance's home view: the stage's centre, at the height the match
+  // start's framing of both fighters on their spawns holds (Camera.snap,
+  // from where they stand, though neither is drawn). Every battle stage's
+  // spawns sit either side of its centre, so the follow camera's target as
+  // the intro starts is this very view: it takes over with no jump.
+  placeEntranceCamera() {
+    const cam = this.camera;
+    cam.snap(this.p1, this.p2);
+    cam.x = this.stage.centerX - cam.w / 2;
+    cam.clampToBounds();
+  }
+
+  // Through the entrance the view is the lens: the home view, never moved
+  // or resized, so the stage's perspective and parallax never change
+  // (js/game/rendering/screen-zoom.js). Part C's camera is a zoom of the
+  // picture in screen space toward each spawn (entranceZoom), the spawn
+  // burst's shake nudging that zoom as far as the framed region allows.
+  // Outside the entrance, the usual view (Arena.syncView).
+  syncView() {
+    if (this.phase !== PHASES.entrance) {
+      this.screenZoom = IDENTITY_ZOOM;
+      super.syncView();
+      return;
+    }
+    const v = this.view;
+    const cam = this.camera;
+    const scale = this.baseScale ?? v.scale;
+    v.scale = scale;
+    v.x = Math.round(cam.x * scale) / scale;
+    v.y = Math.round(cam.y * scale) / scale;
+    v.w = cam.w;
+    v.h = cam.h;
+    if (this.worldPerArt) this.pxPerArt = scale * this.worldPerArt;
+    const shake = this.fx.shakeOffset(this.shakePx);
+    this.screenZoom = nudgedZoom(this.entranceZoom(this.entranceTime ?? 0), v.pxW, v.pxH, -shake.x * v.dpr, -shake.y * v.dpr);
+  }
+
+  // Part C's zoom at entrance time `t` (entranceFraming): toward the spawn
+  // of the team it visits, the framed region's centre moving from the
+  // screen's centre to that fighter's middle as the zoom grows to
+  // CONFIG.battle.entrance.zoom (its reducedZoom, gentler, with reduced
+  // motion), held inside the home frame.
+  entranceZoom(t) {
+    const framing = entranceFraming(this.entrance, t);
+    const v = this.view;
+    if (!framing || !v.pxW) return IDENTITY_ZOOM;
+    const f = this[framing.slot];
+    const at = f.spawnPlacement(this.stage);
+    const [sx, sy] = this.toScreen(at.x, at.y - f.body.height / 2);
+    const most = this.reducedMotion ? this.entrance.reducedZoom : this.entrance.zoom;
+    const a = framing.amount;
+    return framedZoom(v.pxW, v.pxH, 1 + (most - 1) * a, v.pxW / 2 + (sx - v.pxW / 2) * a, v.pxH / 2 + (sy - v.pxH / 2) * a);
+  }
+
+  // The stage is drawn once the entrance's cover has hidden the versus
+  // screen (until then the canvas keeps what it showed: the frame the
+  // player had), through the entrance's zoom.
+  render() {
+    const t = this.entranceTime;
+    if (t !== null && t < this.entrance.coverFull) return;
+    withScreenZoom(this.ctx, this.screenZoom, () => super.render());
   }
 
   // The stage hazards strike and throw only while the match is live: never

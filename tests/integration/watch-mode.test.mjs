@@ -1164,7 +1164,10 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   app.settings.set('mobileControls', 'joystick');
 
   app.screens.go('home', {}, { reset: true });
-  await startQuickBattle(booted);
+  const quick = await startQuickBattle(booted);
+  // Play comes on as the match's entrance hands over to its intro.
+  assert.equal(app.input.gameplayActive, false, 'off through the entrance');
+  while (quick.phase === 'entrance') quick.update(DT);
   assert.equal(app.input.gameplayActive, true);
   assert.equal(screen.touch.enabled, true);
   assert.equal(screen.touchRoot.hidden, false);
@@ -1233,7 +1236,9 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
     assert.equal(ai1.plan, null, `${what}: CPU 1 plans afresh`);
     assert.equal(ai2.plan, null, `${what}: CPU 2 plans afresh`);
     assert.deepEqual(battle.score, { p1: 0, p2: 0 });
-    assert.equal(battle.phase, 'intro');
+    // A fresh match: its entrance first, nobody on the stage yet.
+    assert.equal(battle.phase, 'entrance');
+    assert.deepEqual(battle.inPlay, []);
     assert.equal(screen.hud.left.tag.textContent, 'CPU 1');
   };
   const play = () => {
@@ -1430,6 +1435,7 @@ test('Return to Home after watching, then a Quick Battle behaves exactly as befo
   assert.deepEqual([battle.p1.label, battle.p2.label], ['P1', 'CPU']);
   assert.deepEqual([screen.hud.left.tag.textContent, screen.hud.right.tag.textContent], ['P1', 'CPU']);
   assert.equal(screen.canvas.getAttribute('aria-label'), 'Battle');
+  while (battle.phase === 'entrance') battle.update(DT);
   assert.equal(app.input.gameplayActive, true);
   assert.equal(screen.touch.enabled, true);
   screen.pause();

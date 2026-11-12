@@ -338,6 +338,8 @@ export function otherSide(player, start, { script = () => null, clock } = {}) {
     canvas: { getContext: () => ({}) }, map: setup.map, mode: 'online', p1Def: setup.p1Def, p2Def: setup.p2Def,
     p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input: lockstep.input, seed: setup.seed,
     automaticTurnAround: setup.automaticTurnAround, labels: setup.labels,
+    // As the online battle screen builds it: its entrance first.
+    entrance: true,
   });
   lockstep.attach(battle);
   const ends = [];

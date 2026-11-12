@@ -71,10 +71,13 @@ and add an entry there when the owner names a new one.
   (`tests/benchmarks/launch-thresholds.mjs`) and check the stage art at the
   camera's edges ([stages](./docs/gameplay/stages.md)).
 - **Sound is a closed list** (the Sound update): the five stage themes in
-  their five versions, Practice Ground's ambience and seven effects, all
-  synthesized live, no audio file. Never add another sound (no menu, hit,
-  jump or character sound): the registry refuses it (`ALLOWED_SOUNDS` in
-  `js/core/audio/sounds.js`). Sound only listens to the game, never feeds
-  back, and never names a fighter ([audio](./docs/systems/audio.md)).
+  their five versions, Practice Ground's ambience and eleven effects (the
+  Sound update's seven, and the four the owner added with the match
+  entrance: the spawn, the bolt's strike, the bolt covering the screen and
+  the reveal), all synthesized live, no audio file. Never add another sound
+  (no menu, hit, jump or character sound): the registry refuses it
+  (`ALLOWED_SOUNDS` in `js/core/audio/sounds.js`). Only the owner adds to
+  the list. Sound only listens to the game, never feeds back, and never
+  names a fighter ([audio](./docs/systems/audio.md)).
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).
