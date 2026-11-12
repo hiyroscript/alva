@@ -167,7 +167,7 @@ test('Brave Soldier: the damage a real hit adds to its owner is lower; nothing e
   assert.ok(Math.abs(new CombatSystem().applyHit(null, d.target, probe(5), { hazard: { id: 'rock' } }).damage - 5 * 0.84) < 1e-12);
 });
 
-test('Redoutable Strength: the damage its owner\'s real hits add is higher, where Venture\'s strength applies', () => {
+test('Redoutable Strength: the damage its owner\'s real hits add is higher', () => {
   const d = duel({ attackerModifiers: perquisiteModifiers({ redoutableStrength: 5 }) });
   d.target.combat.launchPoint = 0;
   const e = new CombatSystem().applyHit(d.attacker, d.target, probe(5));

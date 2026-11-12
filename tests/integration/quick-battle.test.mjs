@@ -371,7 +371,7 @@ test('Home Play shows all Mode details immediately and keeps them through dismis
   const info = screens.mode.el.querySelector('.mode-info');
   const headings = ['Adventure', 'Quick battle'];
   const descriptions = [
-    'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep.',
+    'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter. Every 5 levels, choose one Perquisite to keep.',
     'Your opponent’s fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime.',
     'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
     'Quick battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',

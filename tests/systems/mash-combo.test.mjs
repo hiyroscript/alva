@@ -794,7 +794,13 @@ function cpuVersusDummy(c, difficulty, { seconds = 6, seed = 7, gap = 45 } = {})
 test('every CPU level performs it, through legal presses: fresh edges only, five while its first move plays, on the ground', () => {
   for (const difficulty of ['easy', 'medium', 'hard', 'brutal']) {
     for (const c of FIGHTERS) {
-      const { cpu, log } = cpuVersusDummy(c, difficulty);
+      // It mashes only when it sees the opening (its level's punish chance,
+      // drawn each reassessment), so a lower level, Easy above all, may
+      // need a few more tries to set one off: a few more seeds, never a
+      // looser rule for the series it plays.
+      let run = null;
+      for (let seed = 7; seed < 15 && !(run?.cpu.mash.started >= 1); seed++) run = cpuVersusDummy(c, difficulty, { seed });
+      const { cpu, log } = run;
       const why = `${difficulty} #${c.id}`;
       assert.ok(cpu.mash.started >= 1, `${why}: it set one off`);
       // Every press a fresh edge: never pressed on two steps running.

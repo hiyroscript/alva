@@ -13,8 +13,8 @@
 // Levels 5, 10, 15, 20, 25 and 30 carry a small card mark in a corner
 // where a Perquisite is offered: hollow until that milestone's Perquisite
 // is picked, filled after. Under the grid a wide row, information only
-// (never focused): Venture at the level focused (how much smarter and
-// stronger than at Level 1) and the Perquisites the player owns, or a dash.
+// (never focused): Venture at the level focused (how much smarter than at
+// Level 1) and the Perquisites the player owns, or a dash.
 // At the bottom, Reset progress: a first press arms it ("Confirm reset")
 // for 3.2 s, after which it disarms; a second press within that time
 // clears the progress (every level back to 1, every Perquisite and
@@ -162,9 +162,9 @@ export class AdventureLevelScreen extends Screen {
   // The wide row follows the cell focused: Venture at that level.
   showLevel(level) {
     this.shownLevel = level;
-    const { smarts, strength } = ventureNumbers(level);
+    const { smarts } = ventureNumbers(level);
     setText(this.ventureTitle, 'adventure.venture.title', { level: levelLabel(level) });
-    setText(this.ventureLine, 'adventure.venture.line', { smarts, strength });
+    setText(this.ventureLine, 'adventure.venture.line', { smarts });
   }
 
   // An open level: it becomes the one played, on to Select Fighter. A

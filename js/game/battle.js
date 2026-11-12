@@ -47,7 +47,7 @@ import { CelebrationController, CELEBRATIONS, LOSER_CELEBRATIONS, DRAW_CELEBRATI
 import { MatchStats } from './match-stats.js';
 import { overtimePressure } from './physics.js';
 import { resolveDifficulty } from '../data/difficulty.js';
-import { resolveModifiers } from './combat/modifiers.js';
+import { resolveModifiers, isIdentity } from './combat/modifiers.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 
 // Who plays each side, by mode, and the tag it is shown under (HUD cards,
@@ -88,6 +88,18 @@ export const BATTLE_MODES = Object.freeze({
 // where its colours are (the ground rings, name tags and pointers).
 const PLAYER_COLORS = Object.freeze({ local: CONFIG.localPlay.colors, online: CONFIG.online.colors });
 
+// Side `slot`'s modifiers for the battle from `spec` (js/game/combat/modifiers.js).
+// A CPU's side (`side.cpu`) always plays with the identity's: difficulty,
+// Adventure's Venture included, is only how well a CPU thinks, never a
+// multiplier on its fighter, so anything else handed to one is refused.
+function sideModifiers(side, spec, slot) {
+  const mods = resolveModifiers(spec, `Side ${slot}`);
+  if (side.cpu && !isIdentity(mods)) {
+    throw new Error(`[Alva] Side ${slot}: a CPU's fighter plays with the identity's modifiers; no difficulty scales it`);
+  }
+  return mods;
+}
+
 // The match's periods: the normal clock, then (points level) overtime.
 export const PERIODS = Object.freeze({ regulation: 'regulation', overtime: 'overtime' });
 
@@ -123,7 +135,10 @@ export class Battle extends Arena {
   // optional), each side's fighter's modifiers for the whole battle
   // (js/game/combat/modifiers.js), built once here and kept through every
   // restart, rematch and respawn. Left out, a side's are the identity's,
-  // which change nothing, so every other mode plays exactly as ever.
+  // which change nothing, so every other mode plays exactly as ever. A
+  // CPU's side never has any other: no difficulty and no mode scales what
+  // a CPU's fighter does (a level is only how well it thinks), so anything
+  // but the identity handed to one is refused.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
     automaticTurnAround = true, labels = null, cpuLevel = null, modifiers = null,
@@ -137,10 +152,10 @@ export class Battle extends Arena {
     this.mode = Object.keys(BATTLE_MODES).includes(mode) ? mode : 'quick-battle';
     this.difficulty = resolveDifficulty(difficulty);
     this.cpuLevel = cpuLevel ?? null;
-    this.modifiers = Object.freeze({ p1: resolveModifiers(modifiers?.p1, 'Side p1'), p2: resolveModifiers(modifiers?.p2, 'Side p2') });
+    const sides = BATTLE_MODES[this.mode];
+    this.modifiers = Object.freeze({ p1: sideModifiers(sides.p1, modifiers?.p1, 'p1'), p2: sideModifiers(sides.p2, modifiers?.p2, 'p2') });
     this.seed = battleSeed;
 
-    const sides = BATTLE_MODES[this.mode];
     const turnAround = (slot) => (automaticTurnAround && typeof automaticTurnAround === 'object'
       ? automaticTurnAround[slot] !== false
       : automaticTurnAround);

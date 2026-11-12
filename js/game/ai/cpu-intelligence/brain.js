@@ -1375,7 +1375,7 @@ export class CpuIntelligence {
 
   // What reaching for move `m` is worth for variety alone: more the longer
   // it has gone unused (a move left idle is one the opponent stops
-  // covering), most for one not yet used this life. A stronger player
+  // covering), most for one not yet used this life. A smarter player
   // mixes its options up more deliberately (`adapt`).
   variety(m) {
     const u = this.usage.get(m.key);
