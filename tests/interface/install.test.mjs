@@ -294,6 +294,8 @@ test('running as an installed app: a standalone (or fullscreen) display mode, or
   assert.equal(runningInstalled(fakeWindow({ userAgent: UA.iphone, standalone: false })), false);
   assert.equal(runningInstalled(null), false);
   assert.equal(runningInstalled({ navigator: {} }), false, 'no matchMedia at all');
+  assert.equal(runningInstalled({ location: { protocol: 'alva:' } }), true, 'Electron app protocol');
+  assert.equal(runningInstalled({ Capacitor: { isNativePlatform: () => true } }), true, 'Capacitor native WebView');
 });
 
 test('the browser\'s offer is kept for a press of our own; accepted is not installed until appinstalled says so', async () => {
