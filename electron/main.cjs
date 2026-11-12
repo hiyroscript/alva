@@ -27,7 +27,7 @@ async function serveGame(request) {
     return new Response('Bad request', { status: 400 });
   }
   const root = gameRoot();
-  const file = path.resolve(root, \`.\${pathname}\`);
+  const file = path.resolve(root, '.' + pathname);
   if (file !== root && !file.startsWith(root + path.sep)) {
     return new Response('Forbidden', { status: 403 });
   }
