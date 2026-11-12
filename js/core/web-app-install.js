@@ -95,7 +95,7 @@ export const INSTALL_INSTRUCTIONS = Object.freeze({
 export function runningInstalled(win = globalThis.window) {
   // Capacitor's native WebView is already an installed application; do not
   // show the browser's Add-to-Home-Screen instructions inside it.
-  if (win?.Capacitor?.isNativePlatform?.() === true) return true;
+  if (win?.Capacitor?.isNativePlatform?.() === true || win?.location?.protocol === 'alva:') return true;
   if (win?.navigator?.standalone === true) return true;
   const mq = win?.matchMedia;
   if (typeof mq !== 'function') return false;
