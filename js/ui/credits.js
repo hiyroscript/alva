@@ -80,6 +80,10 @@ const SPRITES_0015 = 'https://www.spriters-resource.com/game_boy_advance/sonicba
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0016 is never named).
 const SPRITES_0016 = 'https://www.deviantart.com/xxalexsmashxx/art/1262877085';
+// Where #0017's sprite sheet was published: its page on The Spriters
+// Resource, found by the asset's number alone (the page's title is left out
+// of the address: the character behind #0017 is never named).
+const SPRITES_0017 = 'https://www.spriters-resource.com/ds_dsi/jus/asset/2032/';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -177,6 +181,12 @@ export const CREDITS = [
   {
     title: 'credits.sprites0016.title',
     lines: [{ label: 'credits.sprites0016.sheet', href: SPRITES_0016 }],
+  },
+  // #0017's sheet, linked to where it was published, with who ripped it, as
+  // the sheet itself says.
+  {
+    title: 'credits.sprites0017.title',
+    lines: [{ label: 'credits.sprites0017.sheet', href: SPRITES_0017 }],
   },
   {
     title: 'credits.rights.title',

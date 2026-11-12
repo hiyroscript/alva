@@ -28,6 +28,7 @@ techniques); Launch is its own guide
 | [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `FLOAT_RISE_SPEED`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
 | [`js/game/combat/offense.js`](../../js/game/combat/offense.js) | The attack classification: what a definition can do, apart from how it is executed (`attackOffense`, `projectileOffense`, `techniqueOffense`, `summonOffense`, `actionOffense`, `classifyHit`, `isHarmfulHit`, `resolveOffense`), the hit sources events name (`ATTACK_SOURCES`), and the refused Shield bypasses (`SHIELD_BYPASS_FIELDS`, `assertNoShieldBypass`). |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
+| [`js/game/combat/mimic.js`](../../js/game/combat/mimic.js) | Mimicry (an attack's `mimic`): `strongestProjectile` and `projectileStrength` (what a touch copies), `mimicFrom` (the copy, or the Energy taken instead), `mimicThrow` (the attack a held copy makes of its mimic), `copyOf`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/data/cooldowns.js`](../../js/data/cooldowns.js) | The cooldown policy: `REPEAT_COOLDOWN`, `EXCEPTIONAL_COOLDOWN`, `TEN_DAMAGE_COOLDOWN`, `EXCEPTIONAL_EFFECTS` / `ROUTINE_EFFECTS`, `moveImpact`, `cooldownClass`, `policyCooldown`, `resolveCooldown`. |
@@ -114,7 +115,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. The only way a request ever cuts an attack that can harm short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`; with `volley: { count, interval }`, `count` of them, `interval` apart (below). |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
-| `hits`, `grab`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
+| `hits`, `grab`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes`, `mimic` | — | See below. |
 | `paralyze` / `blockPush` / `quake` / `charm` / `float` / `fear` / `gaze` | 0 / 0 / false / 0 / 0 / 0 / false | The shared hit effects (below). |
 | `offensive` | — | Optional, and only to agree with what the attack does ([attack classification](#attack-classification)). |
 
@@ -177,7 +178,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0016 use them between them
+is built, and usable by any fighter (#0001 to #0017 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -299,8 +300,8 @@ today):
   cooldown policy weighs a move by the harder of the two, so a backstab of
   10 earns 5 s; #0010's Kill), `drain` (Energy, from 0 to the whole bar,
   100, that a real hit takes off its target at once,
-  `CombatState.drain`: never below 0 and given to nobody, since nothing
-  gives Energy back; reaching 0 exhausts the target as any 0 does, so it
+  `CombatState.drain`: never below 0 and given to nobody (only a mimic's
+  `siphon`, below, gives what it takes to its attacker); reaching 0 exhausts the target as any 0 does, so it
   has no Dash, air dash, Deflect, Shield or construct move until its bar
   is full again; no payment, so the target's refill runs on; a blocked hit
   drains nothing, the block's own price being the Shield's; the event says
@@ -360,6 +361,48 @@ today):
   the fighter's own replaced while it plays: #0002's Spin Attack a smaller
   ball, #0008's stretched arms and legs a bigger target, its body and the
   limb it stretches out, so a hit on the limb is a hit on it).
+- **Mimic** (`mimic: { spawnAt, offset, siphon }`, a single melee strike's
+  only: one that throws, strikes in a string, moves on its own, grabs,
+  pulls or turns projectiles back is refused, as is a pending one; [`mimic.js`](../../js/game/combat/mimic.js)):
+  a touch that takes what its target fights with. A real hit of it (never
+  a block, `CombatSystem.update` after `applyHit`) copies the strongest
+  projectile the target throws (`strongestProjectile`: of every projectile
+  in its definition that flies, a `speed` above 0, so never a trap, an
+  obstacle or a call left where it appears, and has its art, the one whose
+  throw deals one target the most, every strike of a piercing one and its
+  finisher counted and a backstab by its harder hit, as the cooldown
+  policy weighs them; then the harder launch; then one that holds; then
+  the first listed) into its fighter's hands (`CombatState.copy`: one at a
+  time, the projectile's own definition, clip and sprite set, gone with
+  the fighter's life). The target keeps its own. A target that throws
+  nothing to copy gives up `siphon` of its Energy instead (a whole number
+  from 0 to 100, taken off at once as a `drain` takes it, never below 0,
+  reaching 0 exhausting it) and **all of it goes to the mimic's fighter**
+  (`CombatState.gainEnergy`, never past its full bar; a full bar ends its
+  exhaustion as any does): the one way anything gives a fighter Energy
+  ([energy](energy.md#rules)). The event says what it took (`copied`, the
+  projectile's id; `siphoned`, the Energy). While its fighter holds a
+  copy, every mimic of it (on the ground or in the air) is, for the
+  Fighter, the CPU and the presentation alike (`Fighter.attackDef`), a
+  throw of that copy instead (`mimicThrow`): the same move and button
+  (its id, so its cooldown is the touch's), clip and phases, no strike of
+  its own, the copy leaving `offset` (facing right, mirrored) the way the
+  fighter faces as `spawnAt` crosses, carried as `borrowed` to
+  `Projectile.release`: the projectile alone, never what threw it, flying
+  and striking exactly as its thrower's does, in its own art at its
+  thrower's art-pixel size, now this fighter's (its hits credit it, its
+  `ability` the mimic). The throw is built by `createAttackDefinition`
+  with the copy as its projectile, so the policies price it by what it
+  throws: 15 Energy and no cooldown for an ordinary copy, none and 3 s for
+  one that holds, none and 5 s for one that deals 10, from the throw.
+  Thrown, the copy is out of its hands; a throw cut short before
+  `spawnAt` keeps it. Routine for the cooldown policy; never a Mash Combo
+  partner (its next use throws); the CPU values a touch by what it would
+  take (a copy's damage and launch, or the Energy as a drain's) and reads
+  a held copy as the ranged throw it is (`readMoveset`,
+  `analyzeCapabilities`, keyed by the copy too). A mark over the fighter
+  shows the copy it holds ([rendering](rendering.md#fighter-status)).
+  #0017's Finders Keepers, on the ground and in the air.
 
 ## Attack classification
 
@@ -441,6 +484,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0014 | `['attack5']` | Sunburst Fist (its Limit Break: a 10-damage punch that only a Limit gauge filled by the damage it takes opens) | Meteodrive and Meteor Strike (grabs), Waterkick (a ground wave), its rushes |
 | #0015 | `['attack3', 'midair_attack3']` | the Gift and the Air Gift (a present left on the floor or in the air that waits for the first opponent to touch it, one at a time) | the Pink Typhoon's tornado (it pulls, carries and throws), the Girl Dunk's shockwave, its hammer and its gloves |
 | #0016 | `['attack5']` | the Medipack (a kneel any blow breaks that heals her) | the Silent Arrow (a technique: an arrow with a backstab), the Twin Pistols (a volley), the Grapple (a lift that pulls), her kicks |
+| #0017 | `['attack4', 'attack5', 'midair_attack5']` | the Earth Chop (a 10-damage quake round her after a breakable wind-up), Finders Keepers and the Air Finders Keepers (a touch that copies the opponent's strongest projectile for her to throw, or takes all its Energy) | Kiiin! (a roll), the Headbutt Dive (a plunge that lands), the Rocket Headbutt (a lift), her kick and her stick |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -523,7 +567,9 @@ to where it comes from, and nothing of it is used up. Then:
    damage, Launch Point before and after, launch values, stun, `perfect`,
    the point it landed, the `paralysis` (the longer of its paralysis and
    its float), the `float`, the `charm` and the `fear` it put on, the
-   Launch Point it `fed` its attacker and the `stall` it caused, and the projectile, summon or technique behind it; `attack`
+   Launch Point it `fed` its attacker, the Energy it `drained`, what a
+   mimic's touch `copied` (a projectile's id) or `siphoned` (the Energy it
+   took for its attacker) and the `stall` it caused, and the projectile, summon or technique behind it; `attack`
    (always true: a blocked attack is still an attack, recorded as a
    block, never as a hit), `source` (`melee`, `deflect`, `projectile`,
    `summon` or `technique`), `ability` (the attack, technique or summon
@@ -835,7 +881,8 @@ Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 #0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
 Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10);
 #0013's Sixty-Four Palms 5 s (its flurry's 10); #0014's Sunburst Fist 5 s
-(its punch's 10); #0016's Medipack 3 s (its heal).
+(its punch's 10); #0016's Medipack 3 s (its heal); #0017's Earth Chop 5 s
+(its quake's 10).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -856,13 +903,17 @@ every move of #0015's (its presents waiting on the stage one at a time,
 its tornadoes' pulls, strikes and carries, the Girl Dunk's slam and
 shockwave earn nothing), and of #0016's but the Medipack (the Twin
 Pistols' four shots add up to 4, the Silent Arrow's backstab of 5 is no
-10, the Grapple is a lift that pulls), and every Deflect none.
+10, the Grapple is a lift that pulls), and of #0017's but the Earth Chop
+(Finders Keepers' touch copies or takes Energy, routine; Kiiin! rolls, the
+Headbutt Dive and the Rocket Headbutt are motions; a copy she throws earns
+whatever it does, so a thrown rocket waits 5 s), and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
 Earth Pillar, Shuriken: once for its volley of three, the Twin Lion
 Fists, Waterkick, #0015's presents and tornadoes, #0016's Twin Pistols:
-once for a volley, and Silent Arrow) cost 15 Energy
+once for a volley, and Silent Arrow, and any ordinary copy #0017 throws)
+cost 15 Energy
 instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and

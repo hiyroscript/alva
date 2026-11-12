@@ -158,6 +158,7 @@ function strikeProblems(atk, spec) {
   if (atk.carry || atk.hits?.some((h) => h.carry)) out.push('it carries its target along');
   if (atk.passThrough) out.push('it passes through fighters');
   if (atk.deflectProjectiles) out.push('it turns projectiles back (a defense)');
+  if (atk.mimic) out.push('it mimics (its next use throws what it copied)');
   if (atk.freeFall) out.push('it spends the airtime');
   if (atk.step && atk.step.speed > MASH_COMBO.maxStep) out.push(`its Step-in lunges at ${atk.step.speed} units/s (a travelling move)`);
   for (const box of strikeBoxes(atk)) {

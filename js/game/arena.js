@@ -23,6 +23,7 @@ import { fighterParts } from './rendering/ensemble.js';
 import {
   drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
   charmMarkRect, drawCharmMark, fearMarkRect, drawFearMark, mashCounterState, mashCounterRect, drawMashCounter,
+  copyMarkRect, drawCopyMark,
 } from './rendering/fighter-status.js';
 import { activeSpecialAbility } from './combat/move-status.js';
 import { drawShield } from './rendering/shield-fx.js';
@@ -792,17 +793,30 @@ export class Arena {
     return mashCounterRect(x, below ? below.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
   }
 
-  // The highest point of what is drawn over `f`: the top of its Mash Combo
-  // counter, fear mark, charm mark or Special ability mark while one shows,
-  // else of its Energy bar or name tag (see barTop). Practice Ground floats
-  // its damage numbers from here.
+  // Where `f`'s held-copy mark goes (see copyMarkRect in
+  // js/game/rendering/fighter-status.js), in device pixels, for as long as
+  // it holds a copy a mimic took (CombatState.copy, read live every frame);
+  // null otherwise. Above every other mark that shows, else above its
+  // Energy bar or name tag.
+  copyMarkRect(f) {
+    if (!f.combat?.copy) return null;
+    const [x] = this.markerAnchor(f);
+    const below = this.mashCounterRect(f) ?? this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    return copyMarkRect(x, below ? below.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
+  }
+
+  // The highest point of what is drawn over `f`: the top of its held-copy
+  // mark, Mash Combo counter, fear mark, charm mark or Special ability mark
+  // while one shows, else of its Energy bar or name tag (see barTop).
+  // Practice Ground floats its damage numbers from here.
   statusTop(f) {
-    const mark = this.mashCounterRect(f) ?? this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    const mark = this.copyMarkRect(f) ?? this.mashCounterRect(f) ?? this.fearMarkRect(f) ?? this.charmMarkRect(f) ??
+      this.specialMarkRect(f);
     return mark ? mark.y - 1 : this.barTop(f);
   }
 
   // Energy bars, the long move cooldowns, the Special ability mark, the
-  // charm mark and the fear mark, for the fighters whose body is on screen
+  // charm mark, the fear mark and the held-copy mark, for the fighters whose body is on screen
   // (the cooldowns of the fighter the ability HUD shows are there instead:
   // see hudCooldownsFor): an off-screen fighter only gets its edge pointer.
   // Each draws only while it has something to show (see
@@ -827,6 +841,8 @@ export class Arena {
         const label = mash.turn ? t('hud.mashCombo', { turn: mash.turn, turns: mash.turns }) : t('hud.mashComboReady');
         drawMashCounter(ctx, this.mashCounterRect(f), mash, label, view.dpr, this.reducedMotion);
       }
+      const copy = this.copyMarkRect(f);
+      if (copy) drawCopyMark(ctx, copy, f.combat.copy, view.dpr);
     }
   }
 

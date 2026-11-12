@@ -319,17 +319,20 @@ export class Projectile {
   }
 
   // Builds the projectile an owner released, or null if it has no such
-  // projectile or no art for it (never an invisible hitbox).
-  static release(owner, { id, offset, direction, ability = id, volleyOf = null }) {
-    const def = owner.projectileDefs?.[id];
-    const anim = def && owner.sprites.projectile(def.animation);
+  // projectile or no art for it (never an invisible hitbox). A copy a mimic
+  // throws (`borrowed`, see js/game/combat/mimic.js) is another fighter's
+  // projectile: its own definition, its own clip and the sprite set it was
+  // drawn from (its art-pixel size), now the owner's.
+  static release(owner, { id, offset, direction, ability = id, volleyOf = null, borrowed = null }) {
+    const def = borrowed ? borrowed.def : owner.projectileDefs?.[id];
+    const anim = borrowed ? borrowed.anim : def && owner.sprites.projectile(def.animation);
     if (!anim) {
       console.warn(`[Alva] Projectile "${id}" has no animation frames; not spawned.`);
       return null;
     }
     const b = owner.body;
     return new Projectile({
-      owner, def, anim, direction, ability, volleyOf,
+      owner, def, anim, direction, ability, volleyOf, sprites: borrowed?.sprites ?? owner.sprites,
       x: b.x + (offset?.x ?? 0) * direction,
       y: b.y + (offset?.y ?? 0),
     });

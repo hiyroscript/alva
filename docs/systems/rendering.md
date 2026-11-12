@@ -13,7 +13,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the Super Jump's dust, the lethal launch's slow motion, the Void's elimination burst and the respawn burst, the same played backwards before a fighter comes back (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
-| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark, fear mark and Mash Combo counter drawn with each fighter. |
+| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark, fear mark, Mash Combo counter and held-copy mark drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
 | [`js/stages/`](../../js/stages/) | Stage themes (Yerma `desert`, Sol-Noir `city`, Asperitas, Adamaris, Jökull `jokull`, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it; Adamaris's draws its volcano, rocks, warnings and impacts from the live stage hazards (`opts.hazards`); Jökull's draws its glacier section by section from them too (each wing's cracks, contacts, break and falling pieces, the centre torn where one went) and its weather (snow, wind and the blizzard's whiteout over the battle canvas, never the HUD). |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
@@ -234,7 +234,7 @@ ready timers draw nothing and leave no gap in the centered row.
 While a fighter performs one of its **Special abilities**
 ([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
-Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack), a bright orange (`#ff9f1c`)
+Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack, #0017's Earth Chop, Finders Keepers and Air Finders Keepers), a bright orange (`#ff9f1c`)
 exclamation mark with a dark outline floats over it, centered above the
 top of its status column (its Energy bar while that shows, else its name
 tag: `Arena.specialMarkRect`, `specialMarkRect` in
@@ -296,6 +296,25 @@ where the other marks bob: 1.5 CSS pixels either side on a 0.12 s cycle
 counts it. It shows for exactly as long as the fear runs
 (`CombatState.fear`, read live every frame), for players and CPUs alike;
 the frightener has none.
+
+### The held-copy mark
+
+While a fighter holds a copy a mimic of its took ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox):
+the strongest projectile of the fighter it touched, which its next mimic
+throws; #0017's Finders Keepers), the copy's own art (its clip's first
+frame, never mirrored, fitted inside) floats over it in a dark round
+badge with a white ring and a dark outline (`COPY_MARK_STYLE`,
+`copyMarkRect` and `drawCopyMark` in
+[`fighter-status.js`](../../js/game/rendering/fighter-status.js);
+`Arena.copyMarkRect`), so both players see what that fighter's next touch
+will throw. It sits centred over the status column, above every other mark
+that shows (the Mash Combo counter, the fear mark, the charm mark, the
+Special ability mark), else above its Energy bar or name tag: 19 world
+units across at the view's scale, never under 18 nor over 34 CSS pixels.
+It does not move. `Arena.statusTop` counts it. It shows for exactly as
+long as the copy is held (`CombatState.copy`, read live every frame: from
+the step it is taken to the step it is thrown or the fighter's life ends),
+for players and CPUs alike.
 
 A floating fighter (a hit's `float`) needs no mark: it is drawn in its
 `midair_hurt` pose, rising.

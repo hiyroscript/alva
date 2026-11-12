@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Sixteen playable fighters** on a 48-slot roster:
+- **Seventeen playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -131,10 +131,18 @@ blocks every attack.
   arrow loosed far across the stage that lands far harder in a back
   turned to it, a grapple fired straight up that hauls her back to the
   stage and drags in whoever waits over her, and a medipack she kneels to
-  patch herself up with).
-  All sixteen Shield
+  patch herself up with),
+  [#0017](docs/characters/0017.md), the robot girl of cartoon strength
+  (Finders Keepers, a touch that copies the strongest projectile her
+  opponent throws, which her next one throws straight back without what
+  threw it, or takes all the Energy of an opponent that throws nothing,
+  for herself; the Earth Chop, a punch that splits the ground round her;
+  Kiiin!, a run at the speed of sound; headbutts forward, up and straight
+  down into the ground, which bursts where she lands; a spinning kick and
+  a stick she pokes things with).
+  All seventeen Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all sixteen Dash on the ground and air dash. Each fighter
+  back at their thrower), and all seventeen Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
@@ -142,7 +150,8 @@ blocks every attack.
   Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
   and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's
   Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's
-  Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack): an orange
+  Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack, #0017's
+  Earth Chop, Finders Keepers and Air Finders Keepers): an orange
   exclamation
   mark floats over
   a fighter while it performs one.
@@ -253,7 +262,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,905):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,986):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -433,6 +442,9 @@ the sheet's own credit: original sprites by SEGA and Sonic Team.
 
 **#0016 sprite source.** Sprite sheet by xxalexsmashxx on
 [DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/1262877085).
+
+**#0017 sprite source.** Sprite sheet ripped by Dazz & Fret on
+[The Spriters Resource](https://www.spriters-resource.com/ds_dsi/jus/asset/2032/).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

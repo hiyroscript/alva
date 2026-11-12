@@ -40,9 +40,23 @@ import {
 } from './prediction.js';
 import { LaunchJudge, KO_VALUE, LAUNCH_POINT_SCALE, riseOf } from './values.js';
 import { effectiveEnergyCost } from './effective.js';
+import { projectileStrength, strongestProjectile } from '../../combat/mimic.js';
 import { stepBody } from '../../physics.js';
 import { attackPhase } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
+
+// What a mimic's touch would copy off fighter `foe` (see strongestProjectile
+// in js/game/combat/mimic.js): its strength, or null when it throws nothing
+// to copy. Read once per fighter and definition: its projectiles are fixed.
+const COPY_WORTH = new WeakMap();
+function copyWorth(foe) {
+  const known = COPY_WORTH.get(foe);
+  if (known && known.defs === foe.projectileDefs && known.sprites === foe.sprites) return known.worth;
+  const copy = strongestProjectile(foe);
+  const worth = copy ? projectileStrength(copy.def) : null;
+  COPY_WORTH.set(foe, { defs: foe.projectileDefs, sprites: foe.sprites, worth });
+  return worth;
+}
 
 // How quickly a sharp opponent reacts to a move it sees coming (seconds):
 // what the CPU assumes, since it cannot know.
@@ -601,6 +615,18 @@ export class Evaluator {
     // Shield, Dash, air dash or Deflect until it has refilled completely.
     const drain = strikes.slice(0, Math.max(1, c.strikes)).reduce((total, h) => total + (h.drain ?? 0), 0);
     if (drain > 0 && !op.exhausted) vHit += drain / 30 + (op.energy <= drain ? 5 : 0);
+    // A mimic: what the touch takes (js/game/combat/mimic.js). A copy of the
+    // opponent's strongest projectile (its definition is public knowledge)
+    // is worth what one throw of it deals, its launch on top; with nothing
+    // to copy, the Energy it takes is weighed as a drain's, the more when it
+    // empties the bar, and it fills the CPU's own.
+    if (m.mimic && !c.projectile) {
+      const copy = copyWorth(s.foe);
+      if (copy) vHit += copy.damage * 0.5 + copy.launch * 0.6;
+      else if (m.mimic.siphon > 0 && !op.exhausted) {
+        vHit += Math.min(op.energy, m.mimic.siphon) / 30 + (op.energy <= m.mimic.siphon ? 5 : 0) + (s.me.exhausted ? 2 : 0);
+      }
+    }
     // What a block costs: the Shield's stall and the recovery left against
     // the blockstun; a block that would exhaust the opponent is a win.
     let vBlock = 0;

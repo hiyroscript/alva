@@ -548,9 +548,9 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(115, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
-    'ability', 'attack', 'attacker', 'authoredBaseLaunch', 'backstab', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'drained', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'heal', 'hitstun',
+    'ability', 'attack', 'attacker', 'authoredBaseLaunch', 'backstab', 'baseLaunch', 'charm', 'copied', 'damage', 'directionalLaunch', 'drained', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'heal', 'hitstun',
     'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'mash', 'move', 'paralysis', 'perfect', 'point',
-    'projectile', 'redirected', 'source', 'stall', 'summon', 'target', 'technique', 'type',
+    'projectile', 'redirected', 'siphoned', 'source', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
   assert.deepEqual([event.attack, event.source, event.ability, event.redirected], [true, 'melee', 'extra_attack', false],
     'an attack, where it came from and what produced it');
@@ -558,6 +558,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   assert.equal(event.energyCost, 0, 'a hit costs its target no Energy');
   assert.deepEqual([event.paralysis, event.float, event.charm, event.fear, event.fed, event.stall], [0, 0, 0, 0, 0, 0], 'no hold, float, charm, fear, feeding or stall');
   assert.equal(event.drained, 0, 'no Energy drained: the hit has no drain');
+  assert.deepEqual([event.copied, event.siphoned], [null, 0], 'nothing copied or siphoned: the hit is no mimic');
   assert.equal(event.backstab, false, 'no backstab: the hit has none');
   assert.deepEqual(
     [event.type, event.attacker, event.target, event.move, event.damage, event.launchPointBefore, event.launchPointAfter],

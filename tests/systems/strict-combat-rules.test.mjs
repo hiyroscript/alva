@@ -292,6 +292,10 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // heal costs nothing; every other move is her own kicks, a shot from
     // her hand and her line.
     '0016': { attack2: 15, midair_attack2: 15, 'tech:attack3': 15, 'tech:attack5': 0 },
+    // Nothing of her own creates anything: the Earth Chop (5 s) pays
+    // nothing, and every other move is her own body and her stick. (A throw
+    // of a copy she holds pays for what it throws: see her own tests.)
+    '0017': { 'tech:attack4': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

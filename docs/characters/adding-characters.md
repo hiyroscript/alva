@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8, 9, 10, 11, 12, 13, 14 and 15 are taken.
+  8, 9, 10, 11, 12, 13, 14, 15 and 16 are taken.
 
 ## 2. Add the art
 
@@ -285,7 +285,11 @@ that seizes nobody lets go at once), `pull`, `airUses`, `freeFall`,
 `blockPush`, `quake`: a hit that reaches only fighters standing on the
 ground, `charm`: for its seconds the target's hits on this fighter heal it
 instead, `backstab`: what the hit deals instead to a fighter with its back
-turned to it)
+turned to it), and `mimic` on a single melee strike (a touch: a real hit
+copies the strongest projectile its target throws for the next use to
+throw instead of striking, the projectile alone, or takes `siphon` of the
+Energy of a target that throws nothing, all of it for its own fighter;
+#0017's Finders Keepers)
 ([combat](../systems/combat.md#attack-mechanics-beyond-a-timed-hitbox)).
 There is no way past a Shield to author: every attack is blockable, and
 `unblockable` (or any other Shield bypass) is refused as the registry
@@ -623,8 +627,8 @@ Then:
    [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
    [#0010](0010.md#controller-layout), [#0011](0011.md#controller-layout),
    [#0012](0012.md#controller-layout), [#0013](0013.md#controller-layout),
-   [#0014](0014.md#controller-layout), [#0015](0015.md#controller-layout)
-   and [#0016](0016.md#controller-layout) do.
+   [#0014](0014.md#controller-layout), [#0015](0015.md#controller-layout),
+   [#0016](0016.md#controller-layout) and [#0017](0017.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a
@@ -671,7 +675,7 @@ valid, current one fails
    | 2 | An easy core game plan with little extra to master. | |
    | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting. #0003: plain, heavy ground game; mastery in timing its long commitments, reading jumps against its quakes, finding room to heal. #0007: plain fists and feet up close, ground-bound weapons from afar; mastery in spending its Energy between shots, placing the fire ahead of an approach and finding room for the rocket's long, breakable aim. #0008: plain fists up close and its own stretched limbs from afar; mastery in limbs that stay open to a hit while they are out, reading shots for its balloon, finding room to eat and landing the giant fist's long, breakable wind-up. #0011: an agile all-rounder; light strikes up close, webbing that holds an approach for a moment, a rising launcher that is also its recovery; mastery in converting its holds, picking safe moments for its breakable casts and spending its camouflage well |
    | 4 | Demanding to use well, with substantial mastery requirements. | #0004: a rhythm controller; placement of its stationary double, timing its long, breakable song onto an opponent who cannot get away and cashing in the charm, light and exposed when rushed before its setups are in place. #0005: a reach-and-setup predator; spacing its long, slow bite, landing the Deadlights only on a facing opponent, timing its phantom and cashing in the fear while it lasts, tall and exposed when rushed. #0009: an elusive elementalist; spending its Energy between wind and rock, converting the freeze before it thaws, steering its own launches, and surviving into danger to find room for its trance's long, breakable meditation. #0010: a small ambusher; getting behind an opponent for the kill and spending its cooldown well, reading when to vent past or away and keeping its hatch out of reach, calling the meeting from far enough and converting the hold, and coming close enough with short, modest blows |
-   | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts |
+   | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts. #0017: a cartoon-strong brawler whose plan changes with each opponent; a slow, short touch that must land unblocked to copy the opponent's best shot (or empty its Energy), the same button then throwing it, each copy priced differently, the exhaustion it leaves cashed in with a long, breakable earth split |
 
    Judge it; never compute it from move counts, Energy costs or any other
    data.

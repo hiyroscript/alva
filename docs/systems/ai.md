@@ -516,7 +516,17 @@ technique's burst and heal, its summon's clone, whether a
 hit is a quake or a gaze, its cooldowns and air uses. A ranged move's
 shot may fly or, with no speed, stand where it appears for its lifetime
 (#0009's Earth Pillar): `readMoveset` reads both, and the shot's path is
-then where it stands. The forward
+then where it stands. A mimic (#0017's Finders Keepers,
+[combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)) is read as
+what it is right now (`Fighter.attackDef`): a melee touch, valued by what
+it would take from its opponent (the definition of the opponent's
+strongest projectile is public knowledge: half a point a point of damage
+one throw of it deals, a little more for its launch; with nothing to copy,
+the Energy it would take weighed as a drain's, the more when it empties
+the bar, and the more when the CPU is exhausted itself), or, while its
+fighter holds a copy, the ranged throw of that copy with the copy's own
+strikes, range, cooldown and Energy cost (`readMoveset` and
+`analyzeCapabilities` are read again whenever the copy changes). The forward
 simulation follows the same rules as combat: a quake strike, burst,
 impact or shot meets only a fighter its path has standing on the ground (so the CPU
 counts on none against an airborne opponent, and fears none while its own

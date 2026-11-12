@@ -8,7 +8,9 @@
 // mark a pink heart over a fighter while a hit's `charm` holds it
 // (CombatState.charm, see js/game/combat/hit-effects.js), and only then; the
 // fear mark a trembling pale-blue drop of cold sweat over a fighter while a
-// hit's `fear` holds it (CombatState.fear), and only then.
+// hit's `fear` holds it (CombatState.fear), and only then; the held-copy
+// mark the art of the projectile a fighter holds while a mimic's copy is in
+// its hands (CombatState.copy), and only then.
 // Presentation reads simulation state; no DOM dependencies or fighter IDs.
 
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -417,6 +419,59 @@ export function drawMashCounter(ctx, rect, state, label, dpr = 1, reducedMotion 
   ctx.fillStyle = color;
   ctx.fillRect(left, top + ph - barH, Math.round(pw * state.progress), barH);
   ctx.fillText(label, Math.round(rect.x), Math.round(top + (ph - barH) / 2 + o));
+  ctx.restore();
+  return true;
+}
+
+// The held-copy mark: over a fighter holding a copy a mimic took (see
+// `mimic` in js/game/combat/attacks.js and CombatState.copy), the copy's own
+// art in a dark round badge with a white ring, from the step it was taken
+// to the step a mimic throws it: what that fighter's next touch will throw.
+// Over any stage and the Void, like the marks.
+export const COPY_MARK_STYLE = Object.freeze({
+  back: 'rgba(8, 8, 8, 0.72)',
+  ring: '#ffffff',
+  outline: '#000000',
+});
+
+// Where the mark goes over a status column centred on device pixel `x`
+// whose topmost status starts at device pixel `top`: { x, y, w, h } (y its
+// top), a small gap above it, never smaller than 18 CSS pixels across nor
+// larger than 34.
+export function copyMarkRect(x, top, scale, dpr = 1) {
+  const d = Math.round(Math.min(Math.max(18 * dpr, 19 * scale), 34 * dpr));
+  const gap = Math.round(Math.max(4 * dpr, 4 * scale));
+  return { x: Math.round(x - d / 2), y: Math.round(top - gap - d), w: d, h: d };
+}
+
+// The mark for `copy` (its normalized clip `anim`, see js/game/combat/mimic.js)
+// in `rect` (copyMarkRect): its first frame fitted inside the ring, never
+// mirrored. False when there is nothing to draw.
+export function drawCopyMark(ctx, rect, copy, dpr = 1) {
+  const frame = copy?.anim?.frames?.[0];
+  if (!frame) return false;
+  const r = rect.w / 2;
+  const cx = rect.x + r;
+  const cy = rect.y + r;
+  const o = Math.max(1, Math.round(dpr));
+  const ring = Math.max(2, Math.round(r * 0.16));
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = COPY_MARK_STYLE.back;
+  ctx.fill();
+  ctx.lineWidth = ring + o * 2;
+  ctx.strokeStyle = COPY_MARK_STYLE.outline;
+  ctx.stroke();
+  ctx.lineWidth = ring;
+  ctx.strokeStyle = COPY_MARK_STYLE.ring;
+  ctx.stroke();
+  if (frame.canvas && frame.artW > 0 && frame.artH > 0) {
+    const fit = (2 * (r - ring - o)) / Math.hypot(frame.artW, frame.artH);
+    const pixelScale = fit >= 1 ? Math.floor(fit) : fit;
+    ctx.imageSmoothingEnabled = false;
+    drawCenteredFrame(ctx, { ...frame, anchorArtX: frame.artW / 2, anchorArtY: frame.artH / 2 }, cx, cy, pixelScale, false);
+  }
   ctx.restore();
   return true;
 }

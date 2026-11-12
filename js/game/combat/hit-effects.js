@@ -88,7 +88,8 @@
 //                       CombatState.drain), from 0 to the whole bar,
 //                       MAX_ENERGY: the flow of its power cut off where it
 //                       was struck. Taken at once and given to nobody
-//                       (nothing gives Energy back); reaching 0 exhausts the
+//                       (only a mimic's siphon gives what it takes to its
+//                       attacker: js/game/combat/mimic.js); reaching 0 exhausts the
 //                       target as any 0 does (no Dash, air dash, Deflect,
 //                       Shield or construct move until its bar is full
 //                       again). It is no payment: the target's refill runs

@@ -231,6 +231,13 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, attack4: 0, midair_attack4: 0,
       attack5: 3, extra_attack: 0, deflect: 0,
     },
+    // The Earth Chop: the ground split for 10. Her touch copies or takes
+    // Energy (routine) and her run, dive and rocket are motions: ordinary.
+    // (A throw of a copy earns whatever the copy does: see her own tests.)
+    '0017': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 5,
+      attack5: 0, midair_attack5: 0, extra_attack: 0, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
