@@ -1,131 +1,99 @@
-# Prompt: Add per-fighter keyboard controls (Settings › Controls › Keyboard controls)
+You are working on my game Alva (repo: hiyroscript/alva), a 2D browser fighting game written in plain HTML/JS. Your job is to turn the game into real installable apps for Windows, macOS, Linux and Android. I'll share the installers on websites like itch.io and my own site, not app stores. iPhone is out of scope.
 
-You are working in the Alva repository (`hiyroscript/alva`), a browser platform fighter written in plain ES modules (no build step). Read `CLAUDE.md` first and follow it. Then read, in this order, before writing any code:
+Before anything else, read CLAUDE.md, README.md, ALVA_SPEC.md, docs/development/itch-release.md, docs/development/online-server.md, tools/itch/*, js/online/server-client.js, js/core/settings.js, js/core/web-app-install.js and server/wrangler.toml. Follow every convention in CLAUDE.md and docs/development/conventions.md: code style, comment style, tests, docs and commit style. The existing code is carefully written. Match its quality and voice.
 
-1. `docs/systems/input.md`: the whole file, especially **Controls**, **Customizing**, **Saved layouts**, **Text fields** and **Dialog layers**.
-2. `ALVA_SPEC.md` §6.10 (Settings), §6.10b (Controller controls), §7.4 (Input) and §7.4a (Game controllers).
-3. `js/config.js` (`bindings`, `menuBindings`, `ACTIONS`, `COMBAT_BUTTONS`, `ACTION_LABELS`).
-4. `js/core/input-manager.js` (`constructor`, `codeToActions`, `_onKeyDown`, `_onKeyUp`, `_refresh`, `startCapture`, `invalidateProfiles`, `profileFor`).
-5. `js/core/settings.js` (the versioned object, `SETTINGS_VERSION = 10`, `MIGRATIONS`, `readCurrent`, the controller-profile setters and the `emit('controllerProfiles', …)` event).
-6. `js/data/controller-profiles.js` (`controllerActions`, `CATEGORIES`, `moveFor`, `recommendedProfile`, `resolveProfile`, `sanitizeStoredProfile(s)`, `profileConflicts`).
-7. `js/ui/settings-dialog.js` (the Controls section: Mobile Controls, Customize touch controls and the **Controller controls** subgroup built around `this.controllerButton` and `openControllerControls()`).
-8. `js/ui/controller-editor.js`, `js/ui/controller-dialog.js`, `js/ui/controller-glyphs.js` and `css/controller.css`: the roster, the editor, the binding dialog and their styles. The keyboard feature is modelled on these.
-9. `js/ui/ability-hud.js` (`keyCapLabel`, how the keyboard input shown on each tile is chosen), `js/screens/battle-screen.js:650` and `js/screens/practice-screen.js:367` (both read `CONFIG.bindings.pause` directly), `js/core/app.js:116` (`new InputManager(CONFIG.bindings, …)`).
-10. `js/localization/strings/en.js` and `fr.js`: every new string goes in both.
-11. The tests listed under **Tests** in `docs/systems/input.md`, especially `tests/interface/controller-ui.test.mjs`, `tests/interface/settings.test.mjs`, `tests/interface/ability-hud.test.mjs`, `tests/systems/controller-profiles.test.mjs` and `tests/systems/request-devices.test.mjs`.
+## What exists already (verify it yourself)
+- `npm run build:itch` builds a self-contained release in `dist/itch/` (index.html at the root, bundled game.js and game.css, packed assets) and zips it to `dist/alva-itch.zip`. `npm run verify:itch` checks it.
+- Save data lives in localStorage (js/core/settings.js).
+- Online play goes to a Cloudflare Worker room server (server/). It only accepts the browser origins listed in `ALLOWED_ORIGINS` in server/wrangler.toml, currently itch.io domains plus localhost. The server URL comes from `CONFIG.online.serverUrl`, so it doesn't depend on the page's address.
+- PWA install support lives in js/core/web-app-install.js and manifest.webmanifest.
+- Icons are in assets/icons/ (192, 512, maskable, apple-touch).
 
 ## Goal
+Each platform's app must be a real native app, not a browser shortcut. It loads the exact same `dist/itch` build, keeps local saves between launches, and online play works the same as the itch HTML version. The HTML/itch release must keep working exactly as it does now. Every existing test and `npm run verify:itch` must still pass.
 
-Today keyboard controls are fixed for everyone (`CONFIG.bindings`), and the Settings note says "Keyboard controls stay the same." Add **keyboard key customization per fighter**, matching how controller controls already work:
+Tools:
+- Desktop (Windows .exe/.msi, macOS .dmg, Linux .AppImage and .deb): **Tauri v2**.
+- Android (.apk for sideloading, plus an .aab built anyway in case I want it later): **Capacitor**.
+- Both use `dist/itch` as their web assets. Don't fork or copy the game code.
 
-- Settings › **Controls** gets a new subgroup, **Keyboard controls** ("Commandes du clavier"), placed directly under the existing **Controller controls** subgroup, with a one-line note and a **Customize keyboard controls** button.
-- That button opens the same three-layer flow as the controller: the **fighter roster** → the chosen fighter's **keyboard editor** → a **key binding dialog**.
-- Each fighter keeps its own saved keyboard layout, stored by fighter id. A fighter the player never customized plays with today's default keys (`CONFIG.bindings`), so nothing changes for anyone who never opens the screen.
+The work is split into two parts with a handoff to me in between. Do not start Part 2 until I tell you my steps are done.
 
-## Design rules (do not break these)
+---
 
-- **One character system.** Never special-case a fighter id in shared code. The actions a fighter's editor lists come from its definition, the same way `controllerActions(def)` does for the controller. A fighter added later works with no change to this feature.
-- **Codenames stay the contract.** The keyboard still produces exactly the same control codenames (`runLeft`, `runRight`, `mouvementLeft`, `mouvementRight`, `down`, `jump`, `extra_attack`, `shield`, `attack1`…`attack5`, `pause`) and the same snapshot, so the Fighter, the CPU, Mash Combo, Online Play's `encodeFrame` and the lockstep never learn that keys were remapped. Respect `codename_rule` (`mouvement`/`mouvment` spelling).
-- **The keyboard has no ground/air resolution.** Unlike the controller, a key press makes no `pressedOnGround` / `pressedInAir` claim. So a keyboard layout binds **controls** (codenames), not `ground:`/`air:` action ids. In the editor, one row per control. For each combat button, show the fighter's real move names for it: ground move, and its air move when it differs (for example "Jab / Floating Straight"), using `moveFor` and the move art the controller editor already uses (`EditorLayer.rowArt` / `previewFrame`). A button the fighter has no move on is not listed, the same as in the controller editor. Its key stays whatever it defaults to and still does nothing for that fighter.
-- **Menus are untouchable.** `CONFIG.menuBindings` (arrows / WASD, Enter / Space / J, Esc / Backspace / K) never changes and is never read from a keyboard layout. No layout can lock a player out of menus.
-- **Pause is always reachable.** Esc always pauses, whatever the layout. The player may bind extra keys to Pause, and may move P, but Esc is permanent: show it in the Pause row as a fixed, non-removable key. Update `battle-screen.js` and `practice-screen.js` so they ask the input manager whether a code is Pause for the current fighter, instead of reading `CONFIG.bindings.pause` directly.
-- **Reserved keys** can never be bound: Esc (Pause only, see above), `Backquote` (the debug overlay, `CONFIG.debug.overlayKey`), Tab, the modifier keys pressed on their own (Shift, Control, Alt, Meta, CapsLock, ContextMenu), and the browser/OS keys (F1–F12, PrintScreen, the OS key). Keep the list in one exported constant and test it.
-- **Keys are physical.** Store `KeyboardEvent.code`, never `.key`, so AZERTY and QWERTY players get the same physical layout, exactly like `CONFIG.bindings` already does. For display, use the keyboard's own label: `navigator.keyboard.getLayoutMap()` where it is available (Chromium), else a fallback that extends `keyCapLabel` (`KeyQ` → Q, `Comma` → `,`, `ArrowLeft` → ←, `Space` → Space/Espace, and so on). Move or share that helper rather than duplicating it.
-- **Text fields keep their keys.** While Online Play's name, room or code field has focus, gameplay and remapped keys never act (see **Text fields**). Do not regress this.
-- **One storage owner.** Only `js/core/settings.js` touches storage.
+## PART 1: everything you can do alone
 
-## Data model: `js/data/keyboard-profiles.js` (new)
+Make a branch `native-apps`, then:
 
-Create it next to `controller-profiles.js`, in the same style and with a header comment like its siblings. It owns:
+1. **App identity.** Use app name "Alva" and the identifier `io.github.hiyroscript.alva` for both Tauri and Capacitor. Read the version from package.json, the single source of truth. Add a `version` field if it's missing, starting at whatever the repo implies, otherwise 1.0.0. Generate every required icon size from assets/icons/alva-512.png (and the maskable icon for Android adaptive icons), using the official Tauri and Capacitor icon tools where possible.
 
-- `KEYBOARD_CONTROLS`: the bindable controls in editor order, each with its category (reuse the controller's categories: Movement = `runLeft`, `runRight`, `down`, `jump`, `mouvementLeft`, `mouvementRight`; Defense = `shield`; Ground/Aerial/Special per the fighter's moves, using `specialAbilities` exactly as the controller editor does; Other = `pause`).
-- `keyboardControls(def)`: the controls this fighter can bind (universal ones always, combat buttons only if the fighter has a move on them).
-- `DEFAULT_KEYBOARD`: built from `CONFIG.bindings`. It is the same default for every fighter. Don't invent per-fighter keyboard defaults.
-- A binding is an ordered array of 1 to `MAX_KEYS_PER_CONTROL` codes (2). A primary key and an optional secondary key, like today's `KeyA` + `ArrowLeft`. The first key is what the ability HUD shows.
-- `RESERVED_KEYS`, and `isBindableKey(code)`.
-- `resolveKeyboardProfile(def, stored)`: defaults overlaid with the stored layout, control by control. Return a full map `codename → codes[]` with Esc forced into `pause`.
-- `keyboardConflicts(profile)`: an **error** when one key is bound to two controls that can both act. Allowed shared keys, not conflicts: none for now. Keep it strict and simple. Also an error when a control is left with no key at all (Pause excluded, since it always has Esc). A **warning** (informational only) when a key is also a menu key the player might not expect in play (for example binding Enter). Note that J and K are menu keys too and that's fine, so don't warn on today's defaults.
-- `sanitizeStoredKeyboardProfile(raw)` / `sanitizeStoredKeyboardProfiles(raw)`: drop anything malformed entry by entry (unknown control, non-string code, reserved key, duplicates, too many keys). Never drop the whole profile or the other fighters' profiles because of one bad entry. A stored layout equal to the default is forgotten (stored as nothing).
+2. **Tauri desktop shell** in `src-tauri/`:
+   - `frontendDist` points to `../dist/itch`. `beforeBuildCommand` runs `npm run build:itch`.
+   - Window: title "Alva", a sensible default size with a minimum size, resizable, fullscreen toggle allowed. Disable the default menu bar on Windows/Linux if that fits a game.
+   - Pick the smallest permissions/capabilities set that works. No filesystem or shell plugins unless truly needed.
+   - Write the CSP so the room server's https and wss URLs are allowed and nothing broader.
+   - localStorage must persist across restarts. Confirm the webview data directory is stable and tied to the identifier.
 
-No fighter id may appear in this module. Add a test that checks that, the way `controller-profiles.test.mjs` does.
+3. **Capacitor Android shell:**
+   - Add a root `capacitor.config.json` (or .ts) with `webDir: "dist/itch"` and `appId`/`appName` as above.
+   - Set `server.androidScheme: "https"` and a custom `server.hostname` such as `alva.app`, so the app's origin is a fixed, unique `https://alva.app`. Use whatever value you choose consistently everywhere.
+   - Run `npx cap add android` and commit the generated `android/` project. Lock orientation to landscape in the manifest if the game expects landscape (check orientation-lock code and tests). Make it fullscreen/immersive, keep the screen on during play if the web code already asks for that, and request no extra permissions beyond INTERNET.
+   - Set minSdk and targetSdk to current sensible values.
+   - Configure release signing to read from environment variables/gradle properties (keystore path, store password, key alias, key password). Never commit a keystore or a password. With no signing variables present, the build must still produce an unsigned or debug APK and not fail.
 
-## Settings: `js/core/settings.js`
+4. **Native detection in the game.** Add one small helper (e.g. in js/core/) that reports whether the game is running inside Tauri, inside Capacitor or in a browser. Use it to:
+   - Hide every "install app" / PWA prompt UI inside the native apps.
+   - Skip service worker / PWA-only behaviour natively, if any exists.
+   - Keep everything else identical. Add or extend tests in tests/interface/ in the repo's existing style.
 
-- Add `keyboardProfiles: { '<fighter id>': { '<control codename>': ['Code', …] }, … }` to the stored object. Bump `SETTINGS_VERSION` to **11**, add a migration from 10 (and let every older migration chain reach 11) that keeps everything and starts with no keyboard profiles. Update the header comment and the stored-shape block.
-- Add a getter and setter mirroring the controller-profile ones (`keyboardProfile(id)`, `setKeyboardProfile(id, profile)`), emitting `('keyboardProfiles', { id, profile })`. Saving a profile equal to the default deletes the entry.
-- Every value is checked on load, exactly as §6.10 describes for the rest. Corrupt keyboard data falls back to defaults without disturbing other settings.
+5. **Online play origins.** Add the native origins to `ALLOWED_ORIGINS` in server/wrangler.toml: `tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost` and your Capacitor origin (e.g. `https://alva.app`). Check that server/src/http.js `parseOrigins`/`originAllowed` handles these schemes, including the non-http `tauri://` one. Fix it and add server tests if not. Check how the client's reachability check (server-client.js, using `location.origin`) behaves inside each shell, so the "origin not allowed" message can't misfire. Do NOT deploy the server; I'll do that.
 
-## Input: `js/core/input-manager.js` and `js/core/app.js`
+6. **npm scripts** in the root package.json, for example: `app:dev`, `build:desktop`, `build:android`, `build:android:release`, `cap:sync`. Add the Tauri CLI and Capacitor packages as devDependencies with exact pinned versions, matching how esbuild is pinned. Update .gitignore for build outputs (src-tauri/target, android build dirs, local.properties, keystores, *.jks).
 
-- Keyboard bindings become **per fighter**. The manager keeps the current keyboard profile, rebuilt when Player 1's fighter changes (in `sample(context)`, from the fighter definition it already receives, cached like `this.profiles` is) or when `keyboardProfiles` changes (`invalidateProfiles` should clear both caches; `App` already listens for `controllerProfiles`, so do the same for `keyboardProfiles`).
-- Rebuild `codeToActions` from the active profile. When it changes mid-hold (a fighter swap in Practice Ground, a layout saved), apply the same "nothing leaks" rule as the controller: every held key is stale until released, and no press edge is made by the swap itself.
-- `e.preventDefault()` still applies only to keys bound for gameplay while `gameplayActive`.
-- Key **auto-repeat is still never a press** (`e.repeat` ignored). Mash Combo's "a held key is one press" must still hold for remapped keys.
-- Add `isPauseKey(code)` (Esc, or any key bound to `pause` for the current fighter) and use it from both screens.
-- **Local Play:** Player 2 has no keyboard today (`player(slot)` samples a controller channel only). Keep it that way. The keyboard layout is Player 1's.
-- **Online Play:** the local player's remapped keys feed `InputManager.sample` as now. Nothing in `js/online/` should change.
-- Add `startKeyCapture(listener)`, a sibling of `startCapture`. While it is active, keydown goes only to the listener (with `preventDefault`) and never reaches the menus, `onKey` subscribers or gameplay. It stops when the returned function is called.
+7. **GitHub Actions** `.github/workflows/native-apps.yml`:
+   - Runs on pull requests and on manual dispatch. Matrix: windows-latest, macos-latest (universal or both arm64 + x64), ubuntu-22.04 for desktop, and ubuntu for Android (JDK 21, Android SDK).
+   - Each job runs the existing tests and `npm run verify:itch`, then builds and uploads the installers as workflow artifacts with clear names, e.g. `Alva-1.0.0-windows-x64-setup.exe`, `Alva-1.0.0-android.apk`.
+   - Android signing is used only when the secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` exist. Otherwise it builds unsigned/debug without failing.
+   - Cache npm, cargo and gradle.
+   - Fix the workflow until it goes green on the PR. Don't stop at "should work".
 
-## UI
+8. **Docs.** Add `docs/development/native-apps.md` covering how the apps work, how to build each one locally, prerequisites (Rust, Android Studio/SDK, JDK), signing, origins, and how releases are produced. Add short pointers in README.md, docs/README.md and UPDATES.md if the repo keeps a changelog there.
 
-### Settings section (`js/ui/settings-dialog.js`)
+9. **Verify everything you can.** Run all tests, `npm run build:itch`, `npm run verify:itch`, a local Linux Tauri build and a debug Android build if this environment allows them. Download the CI artifacts and check they exist and have reasonable sizes. Be honest about anything you couldn't run.
 
-- New subgroup right after `controllerGroup`, built the same way: `h4.settings-subtitle` **Keyboard controls**, `p.settings-group-note` "Customize your keyboard keys for each character individually. Each character starts with the standard keys.", and a `btn settings-customize settings-customize-keyboard` button **Customize keyboard controls** with `aria-haspopup="dialog"`, `aria-describedby` on the note and the right-arrow icon.
-- Update the Controls section's note (currently "The touch and controller layouts for Quick Battle and Practice Ground. Keyboard controls stay the same.") to mention all three: touch, controller and keyboard.
-- Closing Settings closes the whole keyboard flow too (as `this.app.controllerControls?.close({ silent: true })` does), and focus returns to the keyboard button when the flow closes.
-- Keep the tab, scrolling and short-landscape behaviour of the section working with the extra subgroup.
+10. **Open PR #1** titled "Native apps: Windows, macOS, Linux and Android", with a clear description of what changed and what's still pending on my side.
 
-### `js/ui/keyboard-editor.js` (new), with styles in `css/controller.css` or a new `css/keyboard.css` linked in `index.html`
+### Then STOP and send me "Your turn" instructions
+Write them for someone who isn't an expert: numbered steps, exact commands to copy-paste, where to click, what I should see when each step worked, and roughly how long each takes. Only include things you truly cannot do yourself. Expect roughly these, but adjust to what the work actually needed:
 
-Reuse rather than copy. Factor anything the controller editor and the keyboard editor share (the roster layer, the editor shell, row art, category headings, the confirm dialogs, conflict list rendering) into shared helpers where it is clean to do so. Don't make a second roster implementation.
+- **Review and merge PR #1** (or tell me to wait and test first, whichever is safer).
+- **Deploy the room server** so the new origins go live: install wrangler if needed, `cd server`, `npx wrangler login`, `npx wrangler deploy`. Say how to confirm it worked.
+- **Create my Android signing key**, once and forever, with one exact `keytool` command. Explain in plain words that losing this file or password means future updates can't install over old versions, and tell me to back it up somewhere safe outside the repo. Give the exact command to base64 it on Windows (PowerShell) and on Mac/Linux.
+- **Add the 4 GitHub secrets**: exact menu path (repo → Settings → Secrets and variables → Actions → New repository secret) and exact names.
+- **Optional, clearly marked optional:** an itch.io API key as secret `BUTLER_API_KEY` if I want automatic uploads to itch, with the itch project name to give you. Also say plainly that Windows SmartScreen and macOS Gatekeeper will warn about unsigned apps, what players must click to get past it, and that paid signing (Windows certificate, Apple Developer $99/yr) is optional and can be added later.
+- **Test on real devices.** Install the PR's artifacts on my Windows PC and Android phone (and Mac/Linux if I have them). Give a short checklist: game launches, controls and touch work, settings and progress survive closing and reopening, an online room can be created and joined between two devices (e.g. PC app ↔ phone app ↔ itch browser version), and fullscreen/orientation look right.
+- **Reply to you** with "done" plus anything that broke, with screenshots if possible.
 
-- **Roster layer.** The shared fighter roster, titled "Customize keyboard controls", kicker "Settings", the same line saying the choice does not change the fighter played, all 48 slots, locked slots never open. The interaction is identical to the controller roster.
-- **Editor layer.** Portrait, name, a "Default keys" / "Custom keys" tag. The controls grouped by category (a category with nothing in it is left out). Each row is one focus stop named "Change keys: <name>. <key 1>, <key 2>." and shows:
-  - the real name ("Jab / Floating Straight", never "Attack 1") with its one-line description and move art, as the controller editor does;
-  - the bound keys as keycaps (primary, then secondary, or an empty "+ Add" slot);
-  - for Jump, the note that Down + Jump on the ground is the Super Jump; for Down, that a tap drops through a platform.
-  - Instead of the controller diagram, show a small original **keyboard diagram** (an original drawing, not a copy of any brand's art): a compact QWERTY block plus arrows that lights the focused row's keys in green, and any conflicting key in red. It's decorative. Everything must read in text, and it hides under 760 px wide and on short landscape screens, the same breakpoints the controller editor uses.
-  - Live conflicts using `keyboardConflicts`: errors keep **Save** off and are listed with both control names, and warnings only inform.
-  - **Save** stores this fighter alone and closes. **Cancel**/Back asks "Discard changes?" when there are unsaved changes. **Restore defaults** asks "Restore standard keys?" and then puts this fighter alone back on defaults.
-- **Key binding dialog.** "Change keys" for one control. It says "Press a key" and listens through `startKeyCapture`:
-  - the first key pressed fills the slot being edited (primary or secondary). The player can pick the slot with ← → or a click before pressing, and a key already in the other slot of the same control is ignored;
-  - a reserved key shows "This key can't be used" and keeps listening;
-  - a key already used by another control shows the conflict right away ("Already used by Shield") with **Swap** (exchange the keys between the two controls), **Replace** (take it, leaving the other control to fall back to its remaining key or show an error) and **Cancel**;
-  - **Clear secondary**, **Retry**, **Cancel**, **Confirm** (off while it conflicts);
-  - because Esc is reserved, Esc cancels the dialog while listening and is never captured. Backspace is capturable here, since menus are not reading keys while capture is on, but Circle/B on a controller and the visible Cancel button must still back out;
-  - it works fully with a mouse, touch (it can be opened on a tablet with a keyboard attached) or a controller driving the buttons.
-- Every new layer is a proper modal in the existing dialog stack (`role="dialog"`, `aria-modal`, its own `MenuNavigator` scope via `syncLayers`, layers beneath `inert`). Esc / Circle / B steps back one layer with focus returning to what opened it. Follow the four interaction states (default, hover, focus, selected) from `input-modality.js` and `css/base.css`: hover rules start with `:where(html:not(.is-touch-input))` and focus rings with `:where(html:not(.is-pointer-input))`.
-- Visual style matches the controller editor exactly: the same glass panel, sentence case, menu corners and green/orange/red accents. Run `tests/interface/ui-consistency.test.mjs` and `stylesheets.test.mjs`.
-- Responsive: the same size limits as the controller editor (up to 1080 × 860, list scrolling inside).
+End the message with exactly what I should paste back to you to start Part 2.
 
-### Ability HUD
+---
 
-`ability-hud.js` must show the **player's keys for that fighter**: the first key of the control in the resolved keyboard profile, not `CONFIG.bindings`. Redraw the inputs (never the tiles) when `keyboardProfiles` changes, the same way it reacts to `controllerProfiles`.
+## PART 2: after I say my part is done
 
-## Localization
+Make a new branch from the updated main, then:
 
-Add every new string to both `en.js` and `fr.js` (Canadian / international French, concise game terms): the subgroup title and note, the button, roster title, editor tags, row names "Change keys: …", the dialog prompts, "This key can't be used", "Already used by {control}", Swap / Replace / Clear secondary / Add key, both confirmations, the keyboard diagram's accessible label, and key names that need translating (Space → Espace, Enter → Entrée, arrow names). `tests/interface/i18n.test.mjs` must pass (no missing keys in either language).
+1. Fix every problem I reported from device testing, with tests where possible.
+2. Check that the GitHub secrets exist (without printing them) and that a CI run now produces a **signed** release APK. Verify the signature with `apksigner verify`.
+3. Add a release workflow (or extend the existing one) that runs when I push a version tag like `v1.0.0`. It builds all platforms, names files consistently, adds SHA-256 checksums, and creates a GitHub Release with every installer plus the existing `alva-itch.zip` attached, and short notes taken from UPDATES.md.
+4. If `BUTLER_API_KEY` exists, push each build to itch.io with butler on its own channel (windows, mac, linux, android, html) so itch shows proper per-platform downloads. Skip this cleanly if the secret is missing.
+5. Add a simple `npm run release` helper or documented steps for bumping the version in one place and tagging.
+6. Update docs/development/native-apps.md with the final release process and a short, player-facing "How to install" section for each platform (including the SmartScreen, Gatekeeper and "install unknown apps" steps), which I can paste onto my download pages.
+7. Run everything again, make CI green, then open **PR #2** titled "Native apps: signed releases and publishing".
+8. Finish with a short message telling me how to cut my first release (the exact commands) and where the files will appear.
 
-## Documentation
-
-- `ALVA_SPEC.md`: update §6.10 (the Controls section now has Keyboard controls, the new note text, storage version 11 with `keyboardProfiles` and its fallback rules), add **§6.10c Keyboard controls** written in the same voice and detail as §6.10b, and update §7.4 so that keyboard keys are per fighter with the defaults, with menus, Esc and the reserved keys fixed.
-- `docs/systems/input.md`: add the new modules to the module table, change the Controls table's Keyboard column header to "Keyboard (default)", add a **Customizing the keyboard** subsection, and list the new tests.
-- `docs/README.md` if it maps these files. Add an entry to `UPDATES.md` only if the owner names this update.
-
-## Tests (`node --test` must pass in full)
-
-Add or extend, using the existing helpers and patterns:
-
-- `tests/systems/keyboard-profiles.test.mjs` (new): controls per fighter from each real definition (every playable fighter, plus a fighter with only two attacks), defaults equal `CONFIG.bindings`, resolve/overlay, reserved keys refused, Esc always in Pause, conflicts (same key on two controls, a control with no key), sanitizing entry by entry, default-equal profiles forgotten, and no fighter id in the module.
-- `tests/interface/settings.test.mjs`: the version 10 → 11 migration keeps everything and adds no keyboard profiles, every older version still reaches 11, corrupt keyboard data falls back without touching neighbours, save/restore emit `keyboardProfiles`, and storage that throws keeps changes for the visit.
-- `tests/interface/keyboard-ui.test.mjs` (new, modelled on `controller-ui.test.mjs`): the Settings subgroup and button, roster → editor → dialog, locked slots, row names and art for #0001 and #0002 (ground and air names), key capture (primary, secondary, reserved key refused, conflict with Swap and Replace, Esc cancels), Save off while conflicting, Discard changes and Restore defaults confirmations, focus returning through every layer, closing Settings closing all, and both languages.
-- Input on real fighters (extend `request-devices.test.mjs` or add one): a remapped attack fires its move and the old key no longer does, the remap is per fighter (switching fighters in Practice Ground switches keys with no leaked press), a held remapped key is one press, auto-repeat is never a press, a remapped Mash Combo button still makes a Mash Combo (`mash-combo.test.mjs`), remapped Down + Jump makes a Super Jump, Esc always pauses, a key rebound to Pause pauses, and menus ignore the gameplay layout.
-- `ability-hud.test.mjs`: tiles show the remapped key and redraw on save.
-- `online/lockstep.test.mjs`: a remapped key encodes the same frame bits as the default key for the same control.
-
-## Done means
-
-- A player can open Settings › Controls › Customize keyboard controls, pick any playable fighter, remap every one of its controls (two keys each), save, and immediately play Quick Battle, Practice Ground and Online Play with those keys. The ability HUD shows them, and the other fighters are untouched.
-- A player who never opens it notices no difference at all.
-- Menus, Esc, the touch controls, controller layouts and Local Play's Player 2 behave exactly as before.
-- All tests pass, both languages are complete, and the spec and docs describe the feature.
+## Rules throughout
+- Never commit secrets, keystores or passwords, and never print secret values in logs.
+- Don't change gameplay, balance or visuals. Native-specific behaviour changes only through the detection helper.
+- The browser/itch version must behave exactly as before.
+- When a choice is genuinely mine (app ID, landscape lock, a paid option), pick a sensible default, write it in the PR, and keep going instead of blocking.
+- Keep your messages to me short and plain. Save technical detail for PR descriptions and docs.
