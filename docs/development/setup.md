@@ -1,6 +1,6 @@
 # Running and deploying
 
-Alva is static files: there is nothing to install or build to run it.
+Alva's browser version is static files: there is nothing to install or build to run it. Native desktop/mobile packages are optional builds from the same source.
 
 ## Run locally
 
@@ -75,3 +75,77 @@ Upload `dist/alva-itch.zip` by hand as an HTML game; every merge to `main`
 also leaves one, built and checked, on its GitHub Actions run
 (`.github/workflows/itch-release.yml`). How it is made, what it checks and
 the embed settings: [the itch.io release](itch-release.md).
+
+
+## Native desktop and mobile apps
+
+The browser site and itch.io release remain independent of native packaging.
+The native applications reuse the validated itch export, so their HTML,
+JavaScript, stylesheets and game assets are local to the installed app.
+Single-player and local play therefore work offline; Online Play still
+needs an internet connection and the Alva room server.
+
+### Windows, macOS and Linux
+
+Install the optional native build tools (these are not required to run or
+test the browser game):
+
+\`\`\`sh
+npm install --no-save --package-lock=false electron@latest electron-builder@latest
+npm run build:desktop
+npx electron-builder --win nsis --x64
+\`\`\`
+
+The Windows installer is written to \`dist/installers/\`. On Windows, the
+short form is \`npm run package:desktop:win\`. The same desktop bundle can
+be packaged on macOS (\`npx electron-builder --mac dmg\`) and Linux
+(\`npx electron-builder --linux AppImage deb\`). Builds are unsigned by
+default; Windows SmartScreen and macOS Gatekeeper may warn until the
+publisher signs the installers.
+
+### Android
+
+Install Capacitor's optional tools:
+
+\`\`\`sh
+npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
+npm run build:mobile
+npx cap add android       # once per checkout
+npx cap sync android
+node tools/native/prepare-platforms.mjs
+npx cap open android
+\`\`\`
+
+Build a debug APK in Android Studio, or from the command line:
+
+\`\`\`sh
+cd android && ./gradlew assembleDebug
+\`\`\`
+
+The APK is at \`android/app/build/outputs/apk/debug/app-debug.apk\`.
+A Play Store release needs a separately signed Android App Bundle (AAB).
+
+### iPhone and iPad
+
+On a Mac with Xcode, install \`@capacitor/ios\` alongside Capacitor core
+and CLI, then:
+
+\`\`\`sh
+npm run build:mobile
+npx cap add ios            # once per checkout
+npx cap sync ios
+node tools/native/prepare-platforms.mjs
+npx cap open ios
+\`\`\`
+
+A Simulator build can be made without signing. Installing on physical
+devices or publishing through the App Store requires the owner's Apple
+Developer signing certificate and provisioning profile.
+
+### Automated builds
+
+GitHub Actions workflows \`native-desktop.yml\` and \`native-mobile.yml\`
+build Windows/macOS/Linux packages, an Android debug APK and an iOS
+Simulator app. Their artifacts are downloadable from each workflow run.
+The iOS Simulator artifact is for testing, not an installable App Store
+release. The existing \`itch-release.yml\` remains unchanged.
