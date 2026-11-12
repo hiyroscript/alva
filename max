@@ -1,16 +1,20 @@
-You are working on my game Alva (repo: hiyroscript/alva), a 2D browser fighting game written in plain HTML/JS. Your job is to turn the game into real installable apps for Windows, macOS, Linux and Android. I'll share the installers on websites like itch.io and my own site, not app stores. iPhone is out of scope.
+You are working on my game Alva (repo: hiyroscript/alva), a 2D browser fighting game written in plain HTML/JS. Your job is to turn the game into real installable apps for Windows, macOS, Linux and Android, and to make releases fully automatic. I'll share the installers on websites like itch.io, MediaFire and the GitHub Releases page, not app stores. iPhone is out of scope.
 
-Before anything else, read CLAUDE.md, README.md, ALVA_SPEC.md, docs/development/itch-release.md, docs/development/online-server.md, tools/itch/*, js/online/server-client.js, js/core/settings.js, js/core/web-app-install.js and server/wrangler.toml. Follow every convention in CLAUDE.md and docs/development/conventions.md: code style, comment style, tests, docs and commit style. The existing code is carefully written. Match its quality and voice.
+Before anything else, read CLAUDE.md, README.md, ALVA_SPEC.md, UPDATES.md, docs/development/itch-release.md, docs/development/online-server.md, docs/gameplay/online-play.md, tools/itch/*, js/online/*, js/core/settings.js, js/core/web-app-install.js, server/src/* and server/wrangler.toml. Follow every convention in CLAUDE.md and docs/development/conventions.md: code style, comment style, tests, i18n, docs and commit style. The existing code is carefully written. Match its quality and voice.
 
 ## What exists already (verify it yourself)
 - `npm run build:itch` builds a self-contained release in `dist/itch/` (index.html at the root, bundled game.js and game.css, packed assets) and zips it to `dist/alva-itch.zip`. `npm run verify:itch` checks it.
 - Save data lives in localStorage (js/core/settings.js).
-- Online play goes to a Cloudflare Worker room server (server/). It only accepts the browser origins listed in `ALLOWED_ORIGINS` in server/wrangler.toml, currently itch.io domains plus localhost. The server URL comes from `CONFIG.online.serverUrl`, so it doesn't depend on the page's address.
+- Online play goes to a Cloudflare Worker room server with Durable Objects (server/). It only accepts the browser origins listed in `ALLOWED_ORIGINS` in server/wrangler.toml, currently itch.io domains plus localhost. The server URL comes from `CONFIG.online.serverUrl`.
 - PWA install support lives in js/core/web-app-install.js and manifest.webmanifest.
 - Icons are in assets/icons/ (192, 512, maskable, apple-touch).
 
 ## Goal
-Each platform's app must be a real native app, not a browser shortcut. It loads the exact same `dist/itch` build, keeps local saves between launches, and online play works the same as the itch HTML version. The HTML/itch release must keep working exactly as it does now. Every existing test and `npm run verify:itch` must still pass.
+- Each platform's app is a real native app, not a browser shortcut. It loads the exact same `dist/itch` build, keeps local saves between launches, and has working online play.
+- Online play only works between players on the current release version, on every platform including the itch.io HTML version.
+- Releases are automatic: when I push a new UPDATES.md entry, everything is built, published and the server is updated, with no other action from me.
+- The HTML/itch release keeps working as it does now. Every existing test and `npm run verify:itch` must still pass.
+- Everything must stay free: no paid services, certificates or plans.
 
 Tools:
 - Desktop (Windows .exe/.msi, macOS .dmg, Linux .AppImage and .deb): **Tauri v2**.
@@ -25,53 +29,64 @@ The work is split into two parts with a handoff to me in between. Do not start P
 
 Make a branch `native-apps`, then:
 
-1. **App identity.** Use app name "Alva" and the identifier `io.github.hiyroscript.alva` for both Tauri and Capacitor. Read the version from package.json, the single source of truth. Add a `version` field if it's missing, starting at whatever the repo implies, otherwise 1.0.0. Generate every required icon size from assets/icons/alva-512.png (and the maskable icon for Android adaptive icons), using the official Tauri and Capacitor icon tools where possible.
+1. **App identity and version.** Use app name "Alva" and the identifier `io.github.hiyroscript.alva` for both Tauri and Capacitor. package.json `version` is the single source of truth: add it if missing, starting at 1.0.0 unless the repo implies otherwise. Every build reads it: Tauri, Android versionName, an Android versionCode derived from it that always increases (e.g. major*10000 + minor*100 + patch), and the game itself. Generate every required icon size from assets/icons/alva-512.png (and the maskable icon for Android adaptive icons), using the official Tauri and Capacitor icon tools where possible.
 
 2. **Tauri desktop shell** in `src-tauri/`:
    - `frontendDist` points to `../dist/itch`. `beforeBuildCommand` runs `npm run build:itch`.
-   - Window: title "Alva", a sensible default size with a minimum size, resizable, fullscreen toggle allowed. Disable the default menu bar on Windows/Linux if that fits a game.
-   - Pick the smallest permissions/capabilities set that works. No filesystem or shell plugins unless truly needed.
+   - Window: title "Alva", a sensible default size with a minimum size, resizable, fullscreen toggle allowed. No default menu bar on Windows/Linux.
+   - Pick the smallest permissions/capabilities set that works, plus whatever is needed to open the Releases link in the player's normal browser (opener plugin, restricted to that URL).
    - Write the CSP so the room server's https and wss URLs are allowed and nothing broader.
    - localStorage must persist across restarts. Confirm the webview data directory is stable and tied to the identifier.
 
 3. **Capacitor Android shell:**
    - Add a root `capacitor.config.json` (or .ts) with `webDir: "dist/itch"` and `appId`/`appName` as above.
-   - Set `server.androidScheme: "https"` and a custom `server.hostname` such as `alva.app`, so the app's origin is a fixed, unique `https://alva.app`. Use whatever value you choose consistently everywhere.
-   - Run `npx cap add android` and commit the generated `android/` project. Lock orientation to landscape in the manifest if the game expects landscape (check orientation-lock code and tests). Make it fullscreen/immersive, keep the screen on during play if the web code already asks for that, and request no extra permissions beyond INTERNET.
+   - Set `server.androidScheme: "https"` and `server.hostname: "alva.app"`, so the app's origin is a fixed `https://alva.app`. Use that value consistently everywhere.
+   - Run `npx cap add android` and commit the generated `android/` project. Lock orientation to landscape if the game expects it (check the orientation-lock code and tests). Make it fullscreen/immersive and request no permissions beyond INTERNET.
    - Set minSdk and targetSdk to current sensible values.
    - Configure release signing to read from environment variables/gradle properties (keystore path, store password, key alias, key password). Never commit a keystore or a password. With no signing variables present, the build must still produce an unsigned or debug APK and not fail.
 
 4. **Native detection in the game.** Add one small helper (e.g. in js/core/) that reports whether the game is running inside Tauri, inside Capacitor or in a browser. Use it to:
    - Hide every "install app" / PWA prompt UI inside the native apps.
    - Skip service worker / PWA-only behaviour natively, if any exists.
+   - Open external links (like the Releases page) in the player's real browser when running natively.
    - Keep everything else identical. Add or extend tests in tests/interface/ in the repo's existing style.
 
-5. **Online play origins.** Add the native origins to `ALLOWED_ORIGINS` in server/wrangler.toml: `tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost` and your Capacitor origin (e.g. `https://alva.app`). Check that server/src/http.js `parseOrigins`/`originAllowed` handles these schemes, including the non-http `tauri://` one. Fix it and add server tests if not. Check how the client's reachability check (server-client.js, using `location.origin`) behaves inside each shell, so the "origin not allowed" message can't misfire. Do NOT deploy the server; I'll do that.
+5. **Online play origins.** Add the native origins to `ALLOWED_ORIGINS` in server/wrangler.toml: `tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost` and `https://alva.app`. Check that server/src/http.js `parseOrigins`/`originAllowed` handles these schemes, including the non-http `tauri://` one. Fix it and add server tests if not. Check that the client's reachability check (server-client.js, using `location.origin`) behaves correctly inside each shell.
 
-6. **npm scripts** in the root package.json, for example: `app:dev`, `build:desktop`, `build:android`, `build:android:release`, `cap:sync`. Add the Tauri CLI and Capacitor packages as devDependencies with exact pinned versions, matching how esbuild is pinned. Update .gitignore for build outputs (src-tauri/target, android build dirs, local.properties, keystores, *.jks).
+6. **Online play: current version only.**
+   - Embed the release version from package.json in every build at build time, including the itch zip, through the existing build pipeline (e.g. an esbuild `define`). Plain dev runs from the unbundled source count as "dev".
+   - The client sends its version to the room server on the reachability check, on creating a room and on joining a room.
+   - The server reads the current version from a variable (`CURRENT_VERSION` in server/wrangler.toml, set to the package.json version). It refuses any client whose version doesn't match exactly, with a new error code `outdated`, in the same style as the existing codes. Rooms also record their version, so a mismatched player can never join one.
+   - "dev" clients are only accepted from localhost origins, so local testing still works but nobody can bypass the check from a real site.
+   - In the game, an `outdated` refusal shows a friendly message on the Online Play screen: "A new version of Alva is out. Update to play online." Native apps show a button that opens https://github.com/hiyroscript/alva/releases/latest. The itch/browser version tells the player to refresh the page (or re-download, if it's a downloaded copy). Local play, adventure, practice, watch mode and everything offline keep working on any version.
+   - Add the messages to i18n like every other message. Add client and server tests. Update docs/gameplay/online-play.md and docs/development/online-server.md.
+   - Do NOT deploy the server yourself in Part 1. I'll do the first deploy.
 
-7. **GitHub Actions** `.github/workflows/native-apps.yml`:
+7. **npm scripts** in the root package.json, for example: `app:dev`, `build:desktop`, `build:android`, `build:android:release`, `cap:sync`. Add the Tauri CLI and Capacitor packages as devDependencies with exact pinned versions, matching how esbuild is pinned. Update .gitignore for build outputs (src-tauri/target, android build dirs, local.properties, keystores, *.jks).
+
+8. **CI build workflow** `.github/workflows/native-apps.yml`:
    - Runs on pull requests and on manual dispatch. Matrix: windows-latest, macos-latest (universal or both arm64 + x64), ubuntu-22.04 for desktop, and ubuntu for Android (JDK 21, Android SDK).
-   - Each job runs the existing tests and `npm run verify:itch`, then builds and uploads the installers as workflow artifacts with clear names, e.g. `Alva-1.0.0-windows-x64-setup.exe`, `Alva-1.0.0-android.apk`.
+   - Each job runs the existing tests (game and server) and `npm run verify:itch`, then builds and uploads the installers as workflow artifacts with clear names, e.g. `Alva-1.0.0-windows-x64-setup.exe`, `Alva-1.0.0-android.apk`.
    - Android signing is used only when the secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` exist. Otherwise it builds unsigned/debug without failing.
    - Cache npm, cargo and gradle.
    - Fix the workflow until it goes green on the PR. Don't stop at "should work".
 
-8. **Docs.** Add `docs/development/native-apps.md` covering how the apps work, how to build each one locally, prerequisites (Rust, Android Studio/SDK, JDK), signing, origins, and how releases are produced. Add short pointers in README.md, docs/README.md and UPDATES.md if the repo keeps a changelog there.
+9. **Docs.** Add `docs/development/native-apps.md` covering how the apps work, how to build each one locally, prerequisites (Rust, Android Studio/SDK, JDK), signing, origins, the version rule, and how releases will work. Add short pointers in README.md and docs/README.md, and an UPDATES.md entry in the existing format.
 
-9. **Verify everything you can.** Run all tests, `npm run build:itch`, `npm run verify:itch`, a local Linux Tauri build and a debug Android build if this environment allows them. Download the CI artifacts and check they exist and have reasonable sizes. Be honest about anything you couldn't run.
+10. **Verify everything you can.** Run all tests, `npm run build:itch`, `npm run verify:itch`, a local Linux Tauri build and a debug Android build if this environment allows them, and server tests including the version rule. Download the CI artifacts and check they exist and have reasonable sizes. Be honest about anything you couldn't run.
 
-10. **Open PR #1** titled "Native apps: Windows, macOS, Linux and Android", with a clear description of what changed and what's still pending on my side.
+11. **Open PR #1** titled "Native apps: Windows, macOS, Linux and Android", with a clear description of what changed and what's still pending on my side.
 
 ### Then STOP and send me "Your turn" instructions
-Write them for someone who isn't an expert: numbered steps, exact commands to copy-paste, where to click, what I should see when each step worked, and roughly how long each takes. Only include things you truly cannot do yourself. Expect roughly these, but adjust to what the work actually needed:
+Write them for someone who isn't an expert: numbered steps, exact commands to copy-paste (for Windows PowerShell, since I'm on Windows, plus Mac/Linux where they differ), where to click, what I should see when each step worked, and roughly how long each takes. Only include things you truly cannot do yourself. Expect roughly these, but adjust to what the work actually needed:
 
-- **Review and merge PR #1** (or tell me to wait and test first, whichever is safer).
-- **Deploy the room server** so the new origins go live: install wrangler if needed, `cd server`, `npx wrangler login`, `npx wrangler deploy`. Say how to confirm it worked.
-- **Create my Android signing key**, once and forever, with one exact `keytool` command. Explain in plain words that losing this file or password means future updates can't install over old versions, and tell me to back it up somewhere safe outside the repo. Give the exact command to base64 it on Windows (PowerShell) and on Mac/Linux.
-- **Add the 4 GitHub secrets**: exact menu path (repo → Settings → Secrets and variables → Actions → New repository secret) and exact names.
-- **Optional, clearly marked optional:** an itch.io API key as secret `BUTLER_API_KEY` if I want automatic uploads to itch, with the itch project name to give you. Also say plainly that Windows SmartScreen and macOS Gatekeeper will warn about unsigned apps, what players must click to get past it, and that paid signing (Windows certificate, Apple Developer $99/yr) is optional and can be added later.
-- **Test on real devices.** Install the PR's artifacts on my Windows PC and Android phone (and Mac/Linux if I have them). Give a short checklist: game launches, controls and touch work, settings and progress survive closing and reopening, an online room can be created and joined between two devices (e.g. PC app ↔ phone app ↔ itch browser version), and fullscreen/orientation look right.
+- **Review and merge PR #1.**
+- **Deploy the room server once** so the new origins and the version rule go live: install wrangler if needed, `cd server`, `npx wrangler login`, `npx wrangler deploy`. Say how to confirm it worked. Warn me that from this moment, online play only works on the new version, so I should also upload the new itch zip right after.
+- **Create a free Cloudflare API token** using the "Edit Cloudflare Workers" template, and find my Cloudflare Account ID. Give me the exact dashboard clicks. These let GitHub update the server on each release.
+- **Create my Android signing key**, once and forever, with one exact `keytool` command. Explain in plain words that losing this file or password means future updates can't install over old versions, and tell me to back it up somewhere safe outside the repo (e.g. a USB stick plus a private cloud folder). Give the exact PowerShell command to base64 it.
+- **Add the GitHub secrets**: exact menu path (repo → Settings → Secrets and variables → Actions → New repository secret) and exact names: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+- **Optional, clearly marked optional:** an itch.io API key as secret `BUTLER_API_KEY` if I want automatic uploads to itch, plus my itch project name to give you. Also say plainly that Windows SmartScreen and macOS Gatekeeper will warn about unsigned apps, what players click to get past it, and that paid signing is optional and not needed.
+- **Test on real devices.** Install the PR's artifacts on my Windows PC and Android phone (and Mac/Linux if I have them). Short checklist: game launches, controls and touch work, settings and progress survive closing and reopening, an online room can be created and joined between two devices on the same version (PC app ↔ phone app ↔ itch browser version), and fullscreen/orientation look right.
 - **Reply to you** with "done" plus anything that broke, with screenshots if possible.
 
 End the message with exactly what I should paste back to you to start Part 2.
@@ -84,19 +99,30 @@ Make a new branch from the updated main, then:
 
 1. Fix every problem I reported from device testing, with tests where possible.
 2. Check that the GitHub secrets exist (without printing them) and that a CI run now produces a **signed** release APK. Verify the signature with `apksigner verify`.
-3. Add a release workflow (or extend the existing one) that runs when I push a version tag like `v1.0.0`. It builds all platforms, names files consistently, adds SHA-256 checksums, and creates a GitHub Release with every installer plus the existing `alva-itch.zip` attached, and short notes taken from UPDATES.md.
-4. If `BUTLER_API_KEY` exists, push each build to itch.io with butler on its own channel (windows, mac, linux, android, html) so itch shows proper per-platform downloads. Skip this cleanly if the secret is missing.
-5. Add a simple `npm run release` helper or documented steps for bumping the version in one place and tagging.
-6. Update docs/development/native-apps.md with the final release process and a short, player-facing "How to install" section for each platform (including the SmartScreen, Gatekeeper and "install unknown apps" steps), which I can paste onto my download pages.
-7. Run everything again, make CI green, then open **PR #2** titled "Native apps: signed releases and publishing".
-8. Finish with a short message telling me how to cut my first release (the exact commands) and where the files will appear.
+3. **Automatic release workflow** `.github/workflows/release.yml`:
+   - Trigger: a push to main that adds a new entry to UPDATES.md. Pushes that don't add an entry never release. Also allow manual dispatch with a version input.
+   - Steps, in this order, and if any step fails, stop with nothing half-published:
+     a. Bump the patch version in package.json (e.g. 1.0.3 → 1.0.4), unless the new UPDATES.md entry or the manual input names a version, in which case use that. Update CURRENT_VERSION in server/wrangler.toml to match. Commit as a bot ("Release vX.Y.Z") and create the tag `vX.Y.Z`. That commit must not trigger another release.
+     b. Run all tests, then build every platform plus the itch zip from that exact commit.
+     c. Create a GitHub Release `vX.Y.Z` with every installer attached and consistently named: Windows .exe and .msi, Mac .dmg, Linux .AppImage and .deb, Android .apk and .aab, `alva-itch.zip`, plus a SHA-256 checksums file. Release notes come from the new UPDATES.md entry.
+     d. If `BUTLER_API_KEY` exists, push each build to itch.io with butler on its own channel (windows, mac, linux, android, html) so itch shows proper per-platform downloads. Skip this cleanly if the secret is missing.
+     e. Only after all of the above succeeded: deploy the room server with the new CURRENT_VERSION, using the Cloudflare secrets. Players are only locked out once the new version can actually be downloaded.
+   - Use a concurrency group so two releases can never run at once.
+   - Test the whole flow for real with a test release, then delete that test release and tag afterwards, or tell me what's left over.
+4. Make sure https://github.com/hiyroscript/alva/releases/latest always points at the newest release.
+5. Update docs/development/native-apps.md with the final release process, plus a short, player-facing "How to install" section for each platform (including the SmartScreen, Gatekeeper and "install unknown apps" steps) that I can paste onto my download pages.
+6. Run everything again, make CI green, then open **PR #2** titled "Native apps: automatic signed releases".
+7. Finish with a short plain message telling me:
+   - how releases work now: I add an UPDATES.md entry, push, and wait about 20 minutes
+   - where the files appear, and which ones to upload to MediaFire (one per platform: .exe, .dmg, .AppImage, .apk, and the itch zip)
+   - the link to share: https://github.com/hiyroscript/alva/releases/latest
+   - that old versions lose online play the moment a release finishes.
+
+From then on, whenever I say "release X.Y.Z" in a future session, run the release workflow with that version yourself and reply with just the Releases link.
 
 ## Rules throughout
 - Never commit secrets, keystores or passwords, and never print secret values in logs.
 - Don't change gameplay, balance or visuals. Native-specific behaviour changes only through the detection helper.
-- The browser/itch version must behave exactly as before.
-- When a choice is genuinely mine (app ID, landscape lock, a paid option), pick a sensible default, write it in the PR, and keep going instead of blocking.
+- Apart from the version rule, the browser/itch version must behave exactly as before.
+- When a choice is genuinely mine (landscape lock, a version number, an optional feature), pick a sensible default, write it in the PR, and keep going instead of blocking.
 - Keep your messages to me short and plain. Save technical detail for PR descriptions and docs.
-After PR #2 is merged, do the whole release yourself (bump version, tag, push, wait for CI, verify every file) and reply with just the Releases link.
-Also make releases automatic: whenever a push to main adds a new entry to UPDATES.md, bump the patch version, tag it, build everything and publish the Release with those notes. Pushes that don't touch UPDATES.md don't release.
-
