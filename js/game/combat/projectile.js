@@ -108,6 +108,21 @@
 // erasing never keeps one from being turned back. Turned back, it is still
 // an attack (now its new owner's) and still blockable.
 //
+// One field lobs it instead of flying it straight:
+//
+//   arc: { lift, gravity }    it leaves going up at `lift` units/s (0: level)
+//                             and falls at `gravity` units/s every second,
+//                             its `speed` still carrying it the way it was
+//                             thrown: a lob, rising and coming down ahead of
+//                             its thrower, as a grenade does. Its height
+//                             after `t` seconds is exactly projectileDrop's,
+//                             step for step, so the CPU's predictions follow
+//                             the same curve. It lands on nothing: like any
+//                             projectile, the floor (a solid) ends it, and a
+//                             one-way platform never stops it. Turned back,
+//                             it keeps falling where it was. It needs a
+//                             `speed`. #0018's Flash Grenade.
+//
 // One field is art only:
 //
 //   rotationSpeed: 2160       degrees per second it spins as it flies,
@@ -120,7 +135,8 @@
 //                             never turn with it, and being turned back
 //                             never resets it: the spin runs on its age.
 //
-// A projectile flies straight in the direction it was released, hits at most
+// A projectile flies straight in the direction it was released (a lobbed
+// one, `arc`, along its curve that way), hits at most
 // once (a piercing one, its `hits`; an erasing one, each fighter once) and
 // then disappears. It also disappears when its lifetime runs out, when it
 // flies into the Void (the stage's kill boundary; the open air past the
@@ -152,6 +168,7 @@ const PROJECTILE_DEFAULTS = {
   erase: false,   // erases the projectiles it meets and flies on through fighters (see above)
   rotationSpeed: 0, // degrees per second its art spins (see above): rendering only
   maxInPlay: 0,   // the most of its move's projectiles its thrower keeps in play (see above); 0: no bound
+  arc: null,      // { lift, gravity }: lobbed rather than flown straight (see above)
 };
 
 // The attack family projectile `id` belongs to, by codename (see
@@ -185,6 +202,14 @@ export function createProjectileDefinition(spec) {
   if (!(Number.isInteger(def.maxInPlay) && def.maxInPlay >= 0)) {
     throw new Error(`[Alva] Projectile "${spec.id}"'s maxInPlay must be a whole number (0: no bound)`);
   }
+  if (def.arc != null) {
+    const { lift, gravity } = def.arc ?? {};
+    if (!(Number.isFinite(lift) && lift >= 0) || !(Number.isFinite(gravity) && gravity > 0)) {
+      throw new Error(`[Alva] Projectile "${spec.id}"'s arc needs a lift of 0 or more and a positive gravity (units/s, units/s every second)`);
+    }
+    if (!(def.speed > 0)) throw new Error(`[Alva] Projectile "${spec.id}" is lobbed (arc) but has no speed: a lob flies`);
+    def.arc = Object.freeze({ lift, gravity });
+  }
   if (def.pierce) {
     const { hits, interval } = def.pierce;
     if (!(Number.isInteger(hits) && hits >= 2) || !(interval > 0)) {
@@ -208,6 +233,22 @@ export function createProjectileDefinition(spec) {
 }
 
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// The upward speed projectile definition `def` leaves its thrower with:
+// its arc's lift (negative: up), none for one that flies straight.
+export function projectileLaunchVy(def) {
+  return def?.arc ? -def.arc.lift : 0;
+}
+
+// How far below a point it passed (units; negative above it) projectile
+// definition `def` is `t` seconds later, going `vy` (units/s, negative up)
+// there: 0 for one that flies straight, the arc's curve for a lobbed one
+// (see `arc` above). From its release, `vy` is its launch's
+// (projectileLaunchVy). Exactly where Projectile.update puts it, step for
+// step: the one curve the game and every prediction of it share.
+export function projectileDrop(def, t, vy = projectileLaunchVy(def)) {
+  return def?.arc ? vy * t + 0.5 * def.arc.gravity * t * t : 0;
+}
 
 // The angle (radians, clockwise on screen) projectile definition `def`'s
 // art is drawn at `age` seconds into its flight: its rotationSpeed (degrees
@@ -240,6 +281,9 @@ export class Projectile {
     this.direction = direction;
     this.speed = def.speed;
     this.vx = def.speed * direction;
+    // Up or down, for a lobbed one (`arc`): its launch's lift, then its
+    // gravity's pull. Always 0 for one that flies straight.
+    this.vy = projectileLaunchVy(def);
     this.x = x;
     this.y = y;
     this.prevX = x;
@@ -344,6 +388,12 @@ export class Projectile {
     this.prevY = this.y;
     this.prevAge = this.age;
     this.x += this.vx * dt;
+    if (this.def.arc) {
+      // Its curve, exactly (projectileDrop over one step), then its new
+      // speed down.
+      this.y += projectileDrop(this.def, dt, this.vy);
+      this.vy += this.def.arc.gravity * dt;
+    }
     this.age += dt;
     if (this.age >= this.def.lifetime - TIME_EPSILON) {
       this.alive = false;

@@ -252,6 +252,8 @@ export const EN = {
   'credits.sprites0016.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
   'credits.sprites0017.title': '#0017 sprite source',
   'credits.sprites0017.sheet': 'Sprite sheet ripped by Dazz & Fret on The Spriters Resource',
+  'credits.sprites0018.title': '#0018 sprite source',
+  'credits.sprites0018.sheet': 'Sprite sheet by xmaygrrr on DeviantArt',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -562,6 +564,7 @@ export const EN = {
   'discover.fighter.0015.playStyle': 'A small, hammer-wielding scrapper that boxes up close, smashes and dives with heavy swings and whirls up tornadoes that drag opponents along, while traps left in their path punish careless approaches. Its big swings leave it wide open when they miss, and an opponent who keeps its guard up defuses its traps.',
   'discover.fighter.0016.playStyle': 'A nimble adventurer who kicks and flips up close, peppers opponents with paired pistol shots and picks them off from afar with an arrow that punishes any back turned to her. Her draws and her kneeling heal are long, breakable moments, so an opponent who rushes her down denies her the room she needs.',
   'discover.fighter.0017.playStyle': 'A tiny powerhouse who fights like a cartoon: spinning kicks, headbutts and a supersonic run up close, and a touch that takes her opponent\'s own best shot to throw back, or saps it dry when it has none. Her heaviest blows are long, breakable commitments, and what she can take changes with every opponent.',
+  'discover.fighter.0018.playStyle': 'A stalker who cuts up close with knife and katana, buries her blade in turned backs, and blinds from afar to freeze her prey. She vanishes to strike unseen and brings her axe down through a guard, but her heaviest blows are long commitments and she is light when pressed.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

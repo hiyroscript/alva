@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
-import { createProjectileDefinition } from '../../js/game/combat/projectile.js';
+import { createProjectileDefinition, projectileDrop } from '../../js/game/combat/projectile.js';
 import { COPY_FLOOR_CLEARANCE, mimicThrow, projectileStrength, strongestProjectile, throwOffset } from '../../js/game/combat/mimic.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { EXCEPTIONAL_EFFECTS, ROUTINE_EFFECTS } from '../../js/data/cooldowns.js';
@@ -176,6 +176,19 @@ test('a copy too tall for its thrower leaves lifted clear of its feet, never low
   assert.ok(d.events.some((e) => e.attacker === d.attacker && e.source === 'projectile' && e.type === 'hit' && e.damage === 10), 'it struck');
 });
 
+// Where the target of a copy thrown low stands: 200 units off for one that
+// flies straight; for a lobbed one (`arc`, #0018's grenade), just short of
+// where its curve brings it down to the floor from that low hand.
+function reachOf(copy) {
+  const def0 = copy.def;
+  if (!def0.arc) return 200;
+  const o = throwOffset(LOW.attacks.attack1.mimic.offset, def0);
+  const clear = -o.y - (def0.hitbox.y + def0.hitbox.h);
+  let t = 0;
+  while (projectileDrop(def0, t) < clear) t += 1 / 120;
+  return o.x + def0.speed * t - 16;
+}
+
 test('every copy the roster offers, thrown from the ground by a hand low down, flies and strikes', () => {
   for (const target of playableCharacters()) {
     const d = versus(target, { gap: 34 }, LOW);
@@ -186,7 +199,7 @@ test('every copy the roster offers, thrown from the ground by a hand low down, f
     d.attacker.combat.setEnergy(100);
     d.target.combat.launchPoint = 0;
     after(d, 1.2);
-    d.target.body.x = d.attacker.body.x + 200;
+    d.target.body.x = d.attacker.body.x + reachOf(copy);
     d.target.body.vx = 0;
     const from = d.events.length;
     d.tick(P('attack1'));

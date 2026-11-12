@@ -36,6 +36,7 @@ import { perfectShieldValue } from './values.js';
 import { effectiveDamage } from './effective.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
+import { projectileDrop, projectileLaunchVy } from '../../combat/projectile.js';
 
 const HORIZON = 1.1;
 const box = {};
@@ -89,7 +90,7 @@ export class Defense {
     if (v.techniqueDef && v.techniquePhase === 'cast') this.techniqueThreat(s, v, out);
     for (const shot of s.shots) {
       if (shot.owner === s.self) continue;
-      const t = this.projectileThreat(s, shot.x, shot.y, shot.dir, shot.def, shot.age, shot.hits);
+      const t = this.projectileThreat(s, shot.x, shot.y, shot.dir, shot.def, shot.age, shot.hits, 0, shot.vy);
       if (t) {
         t.kind = 'projectile';
         t.ref = shot.p;
@@ -200,23 +201,30 @@ export class Defense {
     });
   }
 
-  // A projectile at (x, y) flying `dir`, `age` seconds old: when it would
-  // meet the CPU (its pull widening what it catches), and what it would cost.
-  projectileThreat(s, x, y, dir, def, age, hits = 0, delay = 0) {
+  // A projectile at (x, y) flying `dir`, `age` seconds old, going `vy` up or
+  // down (a lobbed one's, `arc`; from its release, its launch's): when it
+  // would meet the CPU (its pull widening what it catches), and what it
+  // would cost.
+  projectileThreat(s, x, y, dir, def, age, hits = 0, delay = 0, vy = projectileLaunchVy(def)) {
     if (hits > 0 && !def.pierce && !def.erase) return null;
     const pull = def.pull?.radius ?? 0;
     const life = def.lifetime - age;
     let contact = -1;
     let end = -1;
+    let meetY = y;
     for (let k = 0; k * STEP < Math.min(HORIZON, life + delay); k++) {
       const t = (k + 1) * STEP;
       if (t < delay) continue;
       const px = x + dir * def.speed * (t - delay);
-      boxAt(def.hitbox, px, y, dir, box);
+      const py = y + projectileDrop(def, t - delay, vy);
+      boxAt(def.hitbox, px, py, dir, box);
       const me = this.myAt(s, t);
       this.myBox(s, me.x, me.y, 3 + pull, box2);
       if (overlaps(box, box2)) {
-        if (contact < 0) contact = k;
+        if (contact < 0) {
+          contact = k;
+          meetY = py;
+        }
         end = k;
       } else if (contact >= 0) break;
     }
@@ -231,8 +239,8 @@ export class Defense {
     const sev = this.brain.evaluator.judge.strikes(s, 'me', strikes, n, pos, dir, this.hv);
     return {
       contact: (contact + 1) * STEP, end: (end + 1) * STEP + (def.pierce ? def.pierce.interval * def.pierce.hits : 0.02),
-      top: y + def.hitbox.y - pull, bottom: y + def.hitbox.y + def.hitbox.h + pull, from: -dir, severity: sev.value, ko: sev.ko,
-      blockPush: def.blockPush ?? 0, x, y, dir, def, delay, pull, strikesLeft: n, age,
+      top: meetY + def.hitbox.y - pull, bottom: meetY + def.hitbox.y + def.hitbox.h + pull, from: -dir, severity: sev.value, ko: sev.ko,
+      blockPush: def.blockPush ?? 0, x, y, vy, dir, def, delay, pull, strikesLeft: n, age,
     };
   }
 
@@ -555,7 +563,7 @@ export class Defense {
     if (threat.def) {
       const t = (k + 1) * STEP - (threat.delay ?? 0);
       if (t < 0) return false;
-      boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
+      boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y + projectileDrop(threat.def, t, threat.vy), threat.dir, box);
       box.x -= threat.pull;
       box.y -= threat.pull;
       box.w += threat.pull * 2;
@@ -605,7 +613,7 @@ export class Defense {
           boxAt(hb, arc.x[a], arc.y[a], face, box2);
           const t = (k + 1) * STEP - (threat.delay ?? 0);
           if (t < 0) continue;
-          boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
+          boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y + projectileDrop(threat.def, t, threat.vy), threat.dir, box);
           if (overlaps(box, box2)) return { press: press * STEP, jump: jumpFirst, jumpAt: jumpAt * STEP };
         }
       }

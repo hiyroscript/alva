@@ -310,9 +310,12 @@ export class CombatSystem {
         // that hits flies on through. A Shield that blocks any of them
         // stops it there, an erasing one included (see
         // js/game/combat/projectile.js). A quake flies on past a fighter
-        // off the ground, and a gaze past one with its back to it.
+        // off the ground, and a gaze past one with its back to it: one
+        // turned away from the side the projectile comes from, the way it
+        // travels, wherever over the fighter it happens to be (a lob
+        // dropping past its middle, a shot already flying on past it).
         const def = p.nextHit;
-        if (!hitReaches(def, target, p.x)) continue;
+        if (!hitReaches(def, target, target.body.x - p.direction)) continue;
         const event = this.applyHit(p.owner, target, def, {
           facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 }, fromX: p.x,
         });

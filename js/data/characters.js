@@ -3,7 +3,7 @@
 //
 // Purpose: each fighter's definition lives in a module of its own under
 // js/data/characters/ (0001.js, 0002.js, 0003.js, 0004.js, 0005.js,
-// 0006.js, 0007.js, 0008.js, 0009.js, 0010.js, 0011.js, 0012.js, 0013.js, 0014.js, 0015.js, 0016.js, 0017.js, ...): its animations (each member's,
+// 0006.js, 0007.js, 0008.js, 0009.js, 0010.js, 0011.js, 0012.js, 0013.js, 0014.js, 0015.js, 0016.js, 0017.js, 0018.js, ...): its animations (each member's,
 // for a fighter drawn as several: its `ensemble`), body, Energy, defense,
 // attacks, projectiles, summons, techniques, touch buttons and ability
 // names. Never its movement: run, jump, the triple jump, the Dash and the
@@ -104,6 +104,7 @@ import { CHARACTER_0014 } from './characters/0014.js';
 import { CHARACTER_0015 } from './characters/0015.js';
 import { CHARACTER_0016 } from './characters/0016.js';
 import { CHARACTER_0017 } from './characters/0017.js';
+import { CHARACTER_0018 } from './characters/0018.js';
 
 export { framePath, frames, memberFramePath, memberFrames } from './characters/helpers.js';
 
@@ -127,6 +128,7 @@ export const CHARACTERS = [
   CHARACTER_0015,
   CHARACTER_0016,
   CHARACTER_0017,
+  CHARACTER_0018,
 ];
 
 // Any definition by id, available or not; null for an unknown id.

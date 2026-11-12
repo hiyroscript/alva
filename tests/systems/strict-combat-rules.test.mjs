@@ -296,6 +296,9 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // nothing, and every other move is her own body and her stick. (A throw
     // of a copy she holds pays for what it throws: see her own tests.)
     '0017': { 'tech:attack4': 0 },
+    // Her grenade (3 s for its flash's hold), the Diary (3 s) and the Axe
+    // Swing (5 s) pay nothing, and every other move is her own blades.
+    '0018': { 'tech:attack4': 0, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
