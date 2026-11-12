@@ -1,49 +1,447 @@
-In the alva repo (read CLAUDE.md first and follow it), make three changes to CPU difficulty. Run `node --test` at the end and make sure everything passes.
+# Task: the match entrance cinematic (bolt versus screen, then the camera-led spawns)
 
-## 1. The CPU must never deal more damage because of difficulty. No exceptions, Venture included.
+Read `CLAUDE.md` first and follow every rule in it. This task adds a
+presentation sequence that plays **before every match's existing `intro` phase**
+(the ROUND / FIGHT banner). It also adds **four new sounds** (the spawn, the bolt's
+strike, the bolt covering the screen and the reveal). They break the closed sound list on purpose, and the owner authorizes it
+here (see §6). Everything else is presentation only: it must not change the
+simulation, the combat, the scoring or the fighters' data.
 
-Today every difficulty plays with the same fighter, except Venture in Adventure mode, whose real hits deal 1.05^(L−1) times their damage (×4.12 at Level 30). Remove that completely. From now on every difficulty (Easy, Medium, Hard, Brutal and Venture at every level) uses exactly the same fighter, with the same damage, launch, speed, Energy and every other mechanic. Difficulty only changes how well the CPU thinks.
+Before you write code, read these files to learn how the game is put together now:
 
-Code:
-- `js/data/adventure.js`: delete `VENTURE_STRENGTH_GROWTH` and `ventureStrength`. `ventureModifiers(level)` must no longer return `damageDealt`. If nothing is left in it, remove it and its callers, or have it return no modifiers. Your call, but keep `adventureModifiers` working for the player's Perquisites. `ventureSpec` (around line 276) must return only `smarts`. Rewrite the header comment (lines ~8–41) so it describes only the smarts growth and says Venture never scales a hit.
-- `js/data/difficulty.js`: the header (lines ~19–25) calls Venture's strength "the one deliberate exception". Remove that exception and say plainly that no difficulty and no mode scales a hit, Venture included.
-- `js/game/combat/modifiers.js` stays as it is: `damageDealt` is still needed by the player's Redoutable Strength Perquisite. Only make sure no CPU or difficulty path feeds it anymore, and update any comment that mentions Venture using it.
-- Find every other caller with: `grep -rn "ventureStrength\|VENTURE_STRENGTH\|ventureModifiers\|strength:" js tests`.
+- `js/screens/battle-screen.js`: `enter()` (load sprites → `new Battle(...)` →
+  `setPlayActive(true)`), `update(dt)`, `updateBanner()`, pause, restart and
+  rematch, and the HUD and touch-control wiring.
+- `js/screens/online-battle-screen.js`: how an online match starts in step on
+  both clients, and the drawn-stage `reveal` shown over the intro.
+- `js/game/battle.js`: `PHASES`, `restart()`, `setPhase()`, `frame/advance`, and
+  the `intro` phase timed by `CONFIG.battle.introSeconds`.
+- `js/game/arena.js`: `camera`, `cameraTargets`, `snapCamera()`, `syncView()`
+  (the existing lethal-launch zoom), `render()`, `inPlay`, `announceSpawn()`,
+  `updateRespawns()` and `cue()`.
+- `js/game/rendering/camera.js`: the follow camera, its bounds and its stage anchor.
+- `js/stages/perspective.js`: the one-point perspective. **This is the core of
+  requirement §5.**
+- `js/game/rendering/hit-fx.js`: `addSpawn` (the elimination burst played
+  backwards) and the `HIT_FX` tuning.
+- `js/game/fighters/fighter.js`: `spawnPlacement()`, `respawn()` and `reset()`.
+- `js/game/rendering/sprite-animator.js`, `sprite-normalizer.js`
+  (`drawCenteredFrame`) and `ensemble.js` (`fighterParts`, for multi-body
+  fighters such as #0006).
+- `js/core/audio/sounds.js`, `sfx.js`, `battle-audio.js`, and
+  `docs/systems/audio.md`.
+- `js/config.js` (`CONFIG.battle`), `docs/gameplay/battle.md` and
+  `docs/systems/rendering.md`.
+- `UPDATES.md`: the spawn & landscape update (the respawn burst) and the Sound
+  update.
 
-Interface text (English and French):
-- `js/localization/strings/en.js` lines ~288, 302, 327:
-  - `mode.adventure.overview` → "…Each level, Venture — the CPU — becomes 1.5 times smarter. Every 5 levels, choose one Perquisite to keep." (no "hits 5% harder").
-  - `adventure.venture.line` → `×${fixed2(smarts)} smarter vs Level 1`.
-  - `banner.venture` → `Venture · ×${fixed2(smarts)} smarter`.
-- Make the same changes in `js/localization/strings/fr.js` (lines ~612, 637 and the matching overview), with no damage text.
-- Update whichever screens pass `strength` into those strings (`js/screens/adventure-level-screen.js` and the battle banner).
+## 1. Where the sequence sits
 
-## 2. The only word for "this CPU plays better" is "smarter". Never "stronger".
+Today, after loading, a battle screen shows the stage with both fighters
+already standing on their spawns, and the `intro` phase begins. The new order
+is:
 
-When talking about difficulty, CPU Intelligence, Venture or one difficulty being better than another, use "smarter" (meaning it plays better) or a neutral word like "harder" / "higher level". Never use "stronger", "strength" or "hits harder" for this, in code comments, identifiers, docs, interface text or test names. In French, use "plus intelligent".
+1. Loading finishes.
+2. **Part A, the versus screen (§3).** It covers the screen. The stage is not
+   shown yet: this is the moment before the fighters are "teleported" to the
+   stage.
+3. **Part B, the transition (§3.6).** The green bolt strikes and covers the
+   screen, then the cover clears smoothly to the stage.
+4. **Part C, the camera-led spawns (§4).** The stage has no fighters on it. The
+   camera visits each spawn, and each fighter appears with the respawn
+   animation and the new spawn sound.
+5. The existing `intro` phase (ROUND → FIGHT banner, inputs locked), then
+   `fight`. Do not change this part.
 
-Places to fix (search `grep -rni "stronger\|strength" js tests docs *.md` and go through each hit):
-- `js/data/difficulty.js:88` ("a larger value is the stronger CPU") → "the smarter CPU".
-- `js/game/ai/cpu-intelligence/brain.js:1378` ("A stronger player") → reword.
-- `js/game/ai/cpu-intelligence/objective.js`: the field `this.strength` (from awareness). Rename it to something like `this.weight` or `this.influence`, and update all its uses.
-- Test names in `tests/systems/cpu-intelligence.test.mjs` (~647 "the stronger levels", ~700 "the stronger level takes more points") → "smarter".
-- `tests/systems/venture.test.mjs` (header lines ~5–6, the "---- Stronger ----" section from ~159, the import on line 15): delete the strength tests and replace them with one test asserting that Venture deals the same damage as any other CPU at every level 1–30 (no `damageDealt` from Venture).
-- Docs: `docs/gameplay/adventure.md` (intro line 5 "grows stronger", the "Stronger" bullet at ~111–117, and the example "×11.39 smarter · ×1.34 damage" at ~56), `docs/systems/ai.md`, `ALVA_SPEC.md` (~649, 753, 776 and anything else about Venture or difficulty), `README.md`, `docs/characters/0004.md:424` (where the CPU playing "stronger" means difficulty), and the Adventure row in `UPDATES.md` (line ~27 "1.05 times stronger"). Don't rewrite history in older UPDATES.md entries. Instead, add a short note that the Venture damage growth was removed and when.
+Where it plays:
 
-Do NOT change "stronger" or "strength" where they mean something unrelated: launch strength, the "stronger lines" grid in `js/stages/practice-theme.js`, the `stronger()` stick helper in `js/core/input-manager.js`, stage art and wind strength, a character's in-story strength (`js/data/characters/*`, `docs/characters/*` lore), "stronger tier" in `js/data/launch.js`, the Base Launch help text, the player Perquisite "Redoutable Strength", or a fighter that "grows stronger the more it is beaten" (that's a move mechanic, not difficulty).
+- It plays at every match start in Quick Battle, Adventure, Local Play, Watch
+  Mode and Online.
+- It also plays on Restart and Rematch: each of those is a fresh match that
+  "starts its intro first".
+- It does not play in Practice Ground.
 
-## 3. Make the CPUs less smart
+Implement the sequence as its own module, for example
+`js/game/rendering/match-entrance.js` or `js/ui/match-entrance.js`. Pick the
+place that fits the module-responsibilities doc. Build it as a small state
+machine with named steps and one timeline. Every duration goes into
+`CONFIG.battle.entrance` (or a frozen tuning object beside the module, the way
+`HIT_FX` is laid out), with a comment on each value.
 
-In `js/data/difficulty.js` (`PROFILES`):
-- **Easy and Medium: noticeably less smart.** Slower reactions, more lapses, more noise, bigger range/predict/timing errors, and lower guard, perfectShield, punish, comboReliability, adapt, the senses, diSkill, recoverySkill, discipline and awareness. Lower `lookahead`. As a guide, push each trait about 25–40% of the way toward "worse" (for example, Easy react around [0.38, 0.58], lapse around 0.45, noise around 0.85, punish around 0.18; Medium react around [0.24, 0.38], lapse around 0.22, punish around 0.45). Keep `planDepth` at least 1 and every probability in [0, 1].
-- **Hard and Brutal: slightly less smart**, about 8–15% toward worse on each trait (for example, Brutal react around [0.08, 0.12], noise around 0.06, punish around 0.95; Hard react around [0.16, 0.24], punish around 0.8). Brutal can drop below a perfect 1 on stageSense, diSkill and recoverySkill if that fits.
-- Keep the ordering rule: every trait must stay ordered Easy < Medium < Hard < Brutal by `CAPABILITY` (the existing tests check this). Keep the reaction-window comment above `PROFILES` (lines ~97–104) accurate. Rewrite it if the new numbers change what each level can react to.
-- Venture: Level 1 is built from Easy's profile, so it will now start weaker. Leave `VENTURE_SMARTS_GROWTH` (1.5) and `VENTURE_LIMITS` alone, then recompute and update the milestones in `docs/gameplay/adventure.md` ("by Level 6 it reacts faster than Brutal…", "by Level 9 … 18 of its 24 traits", "from about Level 15…") and the expected numbers in `tests/systems/venture.test.mjs`, `tests/interface/adventure.test.mjs` (~181) and `tests/integration/adventure.test.mjs` (~101). Those expected strings should now be smarts only, for example "×11.39 smarter vs Level 1".
-- Re-run the head-to-head and difficulty tests in `tests/systems/cpu-intelligence.test.mjs`. If a threshold depended on the old numbers (for example "the higher level takes more points"), check the ordering still holds and only adjust the margin, never the direction. Update any difficulty numbers quoted in `docs/systems/ai.md` and `ALVA_SPEC.md`.
+Add a new phase before `intro`, for example `PHASES.entrance`. Alternatively,
+hold the Battle before it starts its intro. Either way, while the entrance runs:
 
-## Done when
-- No difficulty or mode changes the CPU's damage, and a test proves it for Venture at Levels 1–30.
-- `grep -rni "stronger\|strength"` finds nothing about CPU, difficulty or Venture.
-- English and French interface text mention only "smarter" / "plus intelligent".
-- Easy and Medium are clearly easier, Hard and Brutal slightly easier, and the ordering is intact.
-- `node --test` passes. Give a short summary of the old → new profile values.
+- The simulation clock does not run. The match timer does not count down. No
+  stage hazard strikes or advances. No CPU thinks. Inputs are locked and the
+  input buffer is flushed when the entrance ends.
+- The stage theme's purely visual animations (background, Void waves) may keep
+  running, so the stage looks alive.
+- The Battle's own `intro` phase starts only when the entrance ends, with
+  `phaseTime = 0`, so the ROUND/FIGHT banner timing is unchanged.
+- The HUD (health and Launch bars, portraits, names, timer, points), the
+  ability HUDs, the touch controls and the pad hint are hidden or disabled
+  through Parts A and B. Fade the HUD in when Part C ends, as the intro begins.
+  Re-enable the controls at the same moment they are enabled today.
+- The pause button and pause keys keep working. Pausing freezes the entrance
+  timeline and resuming continues it. Online, where pause does nothing, the
+  entrance simply runs.
+- If the game is resized or the orientation changes mid-sequence, the
+  sequence lays itself out again for the new size without restarting.
+- Leaving the screen (`exit()`) tears it down cleanly. Nothing may leak (no
+  rAF, timers, listeners or audio nodes).
+
+## 2. Teams and sides
+
+Team I is `battle.p1` (the left HUD side). Team II is `battle.p2` (the right
+HUD side). Those are the HUD's own names (see `js/ui/hud.js`). Never
+special-case a fighter's id anywhere: every fighter, present or future, goes
+through the same code path. Read the idle animation, the art scale and the
+parts from the fighter's data and sprites. A fighter made of several bodies
+(an ensemble such as #0006) shows all its parts, laid out as `fighterParts`
+lays them out.
+
+## 3. Part A and Part B: the versus screen
+
+Draw Parts A and B on a dedicated overlay canvas. It sits above the battle
+canvas and below the pause menu. It uses the same DPR handling as the battle
+canvas (`CONFIG.render.dprCap`), so the art stays crisp, and the pixel-art
+fighters are drawn with image smoothing off. Draw everything procedurally
+with Canvas 2D: no image files.
+
+### 3.1 The green bolt strikes (t = 0)
+
+A green lightning bolt strikes down the middle of the screen, from the top
+edge to the bottom edge. Its job is to **separate the screen into two halves**:
+Team I's on the left and Team II's on the right, matching the HUD.
+
+- **Shape.** A jagged, slightly diagonal polyline, with 2–4 short side forks.
+  Seed its shape from the match seed, or from a seeded RNG, so online clients
+  match. It is not identical every match.
+- **Look.** Three strokes: an outer glow (a wide, soft, saturated green such as
+  `#2bff6a`, using additive blending or a `shadowBlur` glow), a mid stroke
+  (a bright green) and a near-white core (`#eaffdc`). This is Alva's own green,
+  not the heal green unless the two match.
+- **Strike animation.**
+  - The bolt draws from top to bottom over about 0.12 s.
+  - At contact, a quick full-screen green-white flash (about 0.1 s, low
+    opacity) and a small screen shake. Skip the shake with reduced motion.
+  - The bolt then settles to a steady state with a subtle living flicker: its
+    jitter is re-rolled a few times per second, and its glow pulses slightly.
+    With reduced motion it stays still: no re-roll, only a gentle glow.
+- Nothing else is on screen at this moment. The stage behind is not drawn yet:
+  during Part A the overlay alone is what the player sees. Before the black
+  arrives, the background behind the bolt is the frame the player had, the
+  loading screen's last look. Make the hand-off from the loading overlay
+  seamless, with no flash of the stage and no flash of an empty canvas.
+
+### 3.2 The black screen fades in (about t = 0.25 s → 0.75 s)
+
+A black layer fades in over the whole screen, eased (for example
+`easeInOutQuad`). **The bolt stays drawn above the black and stays fully
+visible**: its glow reads strongly against it.
+
+### 3.3 Team I slides in from the top (about t = 0.95 s)
+
+Team I's fighter, playing its **idle animation** on a loop at its normal frame
+rate, comes **fast, sliding down from above the top edge**. It stops in the
+**middle of Team I's half** (horizontally centred in the left half, vertically
+centred on the screen).
+
+- Motion: about 0.28 s with a strong ease-out and a small overshoot settle
+  (`easeOutBack`, or a damped spring). A brief motion trail or speed lines
+  during the slide are welcome. Keep it subtle.
+- Size: the fighter is drawn large, about 45–55 % of the screen height, by its
+  art height. Fighters of different art sizes must read about equally large,
+  so normalize by height from the sprite normalizer's data.
+- Facing: Team I faces the bolt, to the right.
+
+### 3.4 Team II slides in from the bottom (about t = 1.25 s)
+
+Team II's fighter is handled the same way, with its idle animation looping.
+It comes **fast, sliding up from below the bottom edge**, and stops in the
+middle of Team II's half (the right half). It faces the bolt, to the left.
+
+Optionally, show each fighter's display name in Alva's HUD font under or over
+it as it lands. Localize it through `js/localization`, and keep it subtle.
+Leave the name out if it clutters the screen.
+
+### 3.5 The hold (about 2 s)
+
+Both fighters idle, the bolt flickers, and nothing else happens.
+
+### 3.6 Part B: the bolt strikes the screen and covers it
+
+The bolt then **strikes again**:
+
+- A bright re-strike flash. The bolt thickens and its glow blooms outward from
+  the centre line until **green covers the whole screen**, in about 0.25–0.3 s.
+  Treat it as an expanding glow with a hard green-white core, not a plain
+  colour fill.
+- At full cover, swap what is underneath: remove the versus screen (black,
+  fighters and bolt) and show the battle canvas with the stage, already set up
+  for Part C (no fighters, the camera at its home view, see §4).
+- The green cover then **smoothly transitions out**, revealing the stage. Use
+  an eased fade of about 0.45 s, optionally with a slight inward wipe or a
+  dissolve from the centre outward. Keep it smooth; do not cut.
+
+With reduced motion, keep the same steps but use plain fades instead of the
+bloom and shake.
+
+## 4. Part C: the camera-led spawns
+
+### 4.1 The empty stage
+
+When the cover clears, **no fighter is on the stage**:
+
+- Neither fighter is drawn.
+- Neither has a shadow, marker, status ring or trail.
+- Neither counts as `inPlay`.
+
+The existing state "out of play, waiting to come back" (`lostToVoid`, or
+whatever the Arena uses for a pending respawn) may be reused if it fits.
+Otherwise add a clear, separate flag such as `awaitingEntrance`. Do not reuse
+the Void flag if doing so would count a fall, cue an ejection, touch the
+statistics or draw a Void ripple. Nothing in the match statistics or the score
+may see this sequence.
+
+**The camera is focused on the middle.** Its home view frames the main stage's
+centre (`stage.centerX`) at the height it would hold if both fighters stood on
+their spawns, the framing `camera.snap(p1, p2)` gives at the match start. Work
+out that framing once, from the spawn placements, without drawing the fighters.
+Hold it for a short moment (about 0.6 s).
+
+### 4.2 Team I spawns
+
+1. The camera **zooms in toward Team I's spawn**: it pans and zooms to frame
+   `p1.spawnPlacement(stage)`. Zoom to about 1.6× (tunable) over about 0.6 s,
+   eased in and out. Read §5 before implementing the zoom.
+2. **0.5 s after the zoom arrives**, Team I's fighter spawns with **the respawn
+   animation**: the existing elimination burst played backwards
+   (`HitEffects.addSpawn`, as `Arena.announceSpawn` uses). Time it the way
+   `updateRespawns` does, so that the burst starts `HIT_FX.elimination.life`
+   before the fighter appears, closes in, and pops as the fighter appears. In
+   other words, start the burst at (arrival + 0.5 s − life) so that **the
+   fighter appears exactly 0.5 s after the zoom arrives**. The fighter appears
+   standing at its spawn, playing its idle animation, in its fresh state. The
+   new **spawn sound** (§6) plays on the pop.
+3. A short beat (about 0.35 s) follows. Then the camera **backs out to the
+   middle** (home view, zoom 1) over about 0.6 s, eased.
+
+### 4.3 Team II spawns
+
+Do the same for Team II: zoom in toward Team II's spawn, wait 0.5 s, play the
+respawn animation and the spawn sound, wait a beat, and back out to the middle.
+
+### 4.4 Into the match
+
+Once the camera is back at the home view, hand the camera back to the normal
+follow camera with no jump. Because both fighters are now on their spawns, its
+target is the same home framing; snap it, or check that it matches. Then start
+the existing `intro` phase, and fade the HUD in.
+
+During Part C the fighters that have appeared just idle: inputs stay locked
+and physics does not move them. Make sure they do not slide, fall or
+auto-turn. The sim is held, so this should come for free; verify it.
+
+## 5. The zoom is only a zoom, not a perspective change (strict)
+
+The stages are drawn with a one-point perspective (`js/stages/perspective.js`).
+The projection depends on the view's position: `Perspective.y` reads `view.y`
+against `refY`, and the depth layers parallax with `view.x`. So whenever the
+camera pans or the view rectangle changes, the stage's planes tilt, the
+horizon moves relative to the stage, and the parallax layers slide against
+each other. That is a perspective change.
+
+**For this new system, the camera move toward a spawn must look like a pure 2D
+zoom of the picture.** The frame at zoom `z` toward a focus point must be
+exactly the home frame scaled by `z` about that point on screen: no tilt
+change, no parallax sliding, no horizon shift, and the stage must not flatten
+toward "2D" as it zooms. Only the magnification and the framed region change.
+
+How to do it:
+
+- Keep a frozen **lens view** for the projection: the home view (its `x`, `y`,
+  `w`, `h` and `scale`), used by every perspective and parallax computation for
+  the whole of Part C.
+- Apply the zoom as a **screen-space affine** after projection: a scale `z`
+  about the chosen screen focus, with the pan expressed as a moving focus.
+- Make every draw path honour it: the theme's background, terrain, foreground
+  and Void; `Perspective.plane`, `x`, `y` and `box`; `clipAboveRim`;
+  `Arena.toScreen`; the sprites; the hit FX (including the spawn burst); and
+  the shadows. All of them set absolute transforms
+  (`ctx.setTransform(1,0,0,1,0,0)` and `Perspective.plane`), so a single outer
+  `ctx.scale` will not work. Introduce one place that composes the screen zoom
+  (for example a `view.screen = { k, ox, oy }` used by a helper that every
+  `setTransform` goes through).
+- A simpler alternative is to render the home frame to an offscreen canvas and
+  `drawImage` it scaled. Use it only if it stays crisp at the target zoom on a
+  DPR-capped phone. Pixel art must not blur, and vector stage art must not
+  pixelate visibly. If you choose this route, render the offscreen buffer at
+  `zoomMax ×` resolution during Part C only, and state the cost.
+- The pan must also be expressed through the screen focus. It must never move
+  the lens view's `x` or `y`, or the tilt changes.
+- Clamp the framed region to the screen of the home frame, so the zoom never
+  reveals anything outside what the home frame drew (no blank edges).
+- Do **not** change the existing lethal-launch zoom (`HIT_FX.lethal` in
+  `syncView`) or the normal follow camera's behaviour during play. This rule
+  is scoped to the new entrance system. If the screen-zoom helper you add
+  could also serve the lethal zoom, mention that in your report; do not switch
+  it over.
+
+Add a test that proves §5. For a stage theme and a set of sample world points
+at several depths `f`, check that their screen positions at zoom `z` toward
+focus `F` equal `F + z·(home − F)`, within a pixel.
+
+## 6. The new sounds (authorized exception to the closed list)
+
+The owner asks for four new sounds. This is an explicit, owner-authorized
+**addition to the closed sound list**. Add exactly these four sounds and
+nothing else:
+
+| Id | Kind | When it plays |
+|---|---|---|
+| `sfx.spawn` | 13, "a fighter spawns or respawns" | Described below. |
+| `sfx.boltStrike` | 14, "the entrance bolt strikes" | The first strike (§3.1): a sharp electric crack exactly at contact, with a short sizzling tail. Under the steady flicker that follows, an optional very quiet electric hum, fading out by the time the black has finished fading in. Keep the hum part of this same sound, not a separate one. |
+| `sfx.boltCover` | 15, "the bolt covers the screen" | The re-strike in Part B (§3.6): a bigger, brighter crack whose swelling roar rises with the glow as it blooms to cover the screen. It peaks at full cover. |
+| `sfx.entranceReveal` | 16, "the cover clears to the stage" | The transition out (§3.6): a smooth airy whoosh or a reverse-swell that resolves softly as the green clears and the stage appears. Pitch it so it leads naturally into the stage's music. |
+
+Make all four live-synthesized recipes in `js/core/audio/sfx.js`, built from
+the existing building blocks (see below). Choose their pitches so that each
+one leads into the next and they sound like one family. Mix the two bolt
+sounds a little louder than the hits, because they are the cinematic's big
+moments. Keep them all under the ejection sounds' peak. Cue each one from the
+entrance's own timeline through the same listener mechanism the arena uses
+(`cue('entranceBolt')`, `cue('entranceCover')`, `cue('entranceReveal')`, or
+similar names). Each sound is cued at its exact visual moment, so pausing the
+entrance also delays it. Sound still only listens: audio never drives the
+timeline.
+
+The rest of this section is about `sfx.spawn`.
+
+- **Where it plays.** On the pop of every spawn burst: the two entrance spawns
+  (§4) and every normal respawn after the Void (`updateRespawns`, the moment
+  the fighter is back). Both paths cue it through `Arena.cue('spawned',
+  { fighter })` (or an equivalent name). `battle-audio.js` maps that cue to
+  `sfx.spawn`.
+  - Sound "only listens to the game": the cue is fired by the arena and the
+    audio reacts. Audio never drives the timeline.
+  - It never names a fighter: the same sound plays for everyone.
+  - Practice Ground's arrivals and respawns follow whatever the ejection
+    sounds do there. Check `docs/systems/audio.md` and match that.
+- **What it sounds like.** Synthesize it live, as a recipe in
+  `js/core/audio/sfx.js`, using the existing building blocks (`ring`, `burst`,
+  `boom`, `brassHit`, `strip`). Aim for a "materialize" feeling that mirrors
+  the burst played backwards: a short rising shimmer or reverse-swell (about
+  0.3–0.4 s) that resolves into a bright, punchy pop with a soft low thump and
+  a sparkly tail. Mix it so that it is satisfying but sits under the music and
+  the ejection effects. Keep its pitch steady, or vary it only slightly with a
+  seeded variation. It must not clash with the stage themes' keys more than
+  the existing effects do.
+- **Updates the exception requires**, all in the same change:
+  - `js/core/audio/sounds.js`: the four `SFX` entries, `SOUND_KINDS` (kinds
+    `'13'` to `'16'`), the header comment (twelve kinds → sixteen, seven
+    effects → eleven) and the wording of the registry error.
+  - `CLAUDE.md`'s "Sound is a closed list" bullet: eleven effects, the spawn
+    and the three entrance sounds included. Keep the rule otherwise intact. It
+    is still closed: these four sounds were added by the owner.
+  - `docs/systems/audio.md`, `ALVA_SPEC.md` (wherever the sound list is
+    specified) and `tests/systems/audio.test.mjs` (the counts and lists).
+  - The effects-volume setting must cover it like the other effects.
+
+## 7. Online, determinism and the other modes
+
+- **Online.** Both clients must play the entrance with the same total length,
+  and the match (the sim's `intro`, then `fight`) must start in step on both,
+  exactly as it does today. Read how `online-battle-screen.js` and
+  `js/online/` start and time a match. Either fold the entrance's fixed length
+  into the agreed start, or make the entrance a fixed-length,
+  simulation-independent hold that both clients begin at the same agreed
+  moment. Do not let a slow tab desynchronize the start; check how
+  hidden-page handling works today. The drawn-stage `reveal` must still make
+  sense: show it after the cover clears, or fold it into Part C.
+- **Seeded randomness only.** Use only seeded randomness for anything visual
+  that could differ (the bolt's shape). `Math.random` is acceptable only for
+  purely local flicker that never affects timing.
+- **Watch Mode.** It plays the same way.
+- **Local Play.** It plays the same way, with both fighters named by side.
+- **Adventure.** Its own level banner logic (`bannerConfig`) must still work.
+  Put Adventure's intro banner after the entrance, in the `intro` phase as
+  today.
+- **Restart and Rematch** replay the entrance. `Battle.restart()` must
+  therefore return the fighters to the "awaiting entrance" state, not to
+  standing on the stage.
+- **Reduced motion** (`app.device.reducedMotion`): no shake, no overshoot and
+  no bolt re-roll; the slides become short eased moves, or fades in place; the
+  camera zoom becomes a gentler, shorter move, or a cross-fade. The total
+  sequence keeps the same steps.
+
+## 8. Timeline defaults (all tunable in one place)
+
+| Step | Start (s) | Duration (s) |
+|---|---|---|
+| Bolt strike | 0.00 | 0.12 draw + 0.10 flash |
+| Black fade-in | 0.25 | 0.50 |
+| Team I slide (from top) | 0.95 | 0.28 |
+| Team II slide (from bottom) | 1.25 | 0.28 |
+| Hold | → 3.50 | |
+| Bolt covers the screen | 3.50 | 0.28 |
+| Green clears to the stage | 3.78 | 0.45 |
+| Empty-stage hold at the centre | → 4.85 | |
+| Zoom to Team I | 4.85 | 0.60 |
+| Team I appears, sound | arrival + 0.50 (burst starts `elimination.life` earlier) | |
+| Beat, then back to the centre | +0.35 | 0.60 |
+| Same for Team II | | |
+| Hand-off → existing `intro` phase | ~ 10 s total | |
+
+If the total feels long in play, shorten the holds first. Keep the 0.5 s
+"zoom arrives → fighter appears" gap exactly as the owner specified.
+
+## 9. Documentation and tests
+
+- **Documentation.**
+  - `docs/gameplay/battle.md`: the match's phases now begin with the entrance.
+  - `docs/systems/rendering.md`: the entrance overlay and the screen-space zoom
+    rule (§5).
+  - `docs/systems/audio.md`: the four new sounds.
+  - `ALVA_SPEC.md` where the match start and the sound list are specified.
+  - `UPDATES.md`: an entry describing this work, its tuning location and its
+    tests. Do not invent a name for the update. If the owner names it later,
+    add it to the named-updates table and to `CLAUDE.md`.
+- **Tests** (`node --test`). Run the whole suite and keep it green. Add:
+  - The entrance timeline in order: no fighter in play until its spawn moment.
+    Each fighter appears exactly 0.5 s after its zoom arrives. The `intro`
+    phase starts only after both have spawned and the camera is home. The
+    match timer did not move during the entrance.
+  - The spawn cue fires once per entrance spawn and once per Void respawn,
+    and maps to `sfx.spawn`.
+  - The sound registry accepts the four new sounds and still refuses anything
+    else. Each entrance sound is cued once, at its step's start time.
+  - The §5 screen-zoom invariant.
+  - Restart and Rematch replay the entrance.
+  - The ejection, statistics and score are untouched by the entrance.
+  - Any online test that checks both clients start the fight in step, updated
+    for the entrance.
+- **Check by eye.** Run the game, take screenshots or a short recording at each
+  step (bolt, black, both slides, the cover, the empty stage, each zoom, each
+  spawn, the hand-off) on a landscape phone size (for example 844×390) and on
+  a desktop size. Check that the zoom shows no tilt or parallax change by
+  comparing the home frame and the zoomed frame. Report what you checked.
+
+## 10. Constraints recap
+
+- No fighter id special-cased. All tuning lives in one place.
+- No image or audio files: everything is procedural Canvas 2D and live
+  synthesis.
+- Sound: exactly four new sounds (`sfx.spawn`, `sfx.boltStrike`,
+  `sfx.boltCover` and `sfx.entranceReveal`), added through the registry, with
+  every place that lists the sounds updated.
+- The simulation is untouched by the entrance: no combat, scoring or physics
+  changes, and the match clock does not run during it.
+- Do not edit `character_rule`. Keep the naming contract in `codename_rule`.
+- Leave the touch comfort, controller comfort and stage geometry rules as they
+  are.
+- When finished, report:
+  - the files changed;
+  - how §5 was achieved, and its cost;
+  - how online sync was kept;
+  - anything you could not satisfy, and why.
