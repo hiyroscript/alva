@@ -14,7 +14,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { createProjectileDefinition } from '../../js/game/combat/projectile.js';
-import { mimicThrow, projectileStrength, strongestProjectile } from '../../js/game/combat/mimic.js';
+import { COPY_FLOOR_CLEARANCE, mimicThrow, projectileStrength, strongestProjectile, throwOffset } from '../../js/game/combat/mimic.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { EXCEPTIONAL_EFFECTS, ROUTINE_EFFECTS } from '../../js/data/cooldowns.js';
 import { MAX_ENERGY } from '../../js/data/energy.js';
@@ -23,6 +23,7 @@ import { readMoveset } from '../../js/game/ai/moveset.js';
 import { analyzeCapabilities } from '../../js/game/ai/cpu-intelligence/capabilities.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { def, duel, fakeSpritesOf, steps } from '../helpers/fighter-harness.mjs';
+import { playableCharacters } from '../../js/data/characters.js';
 
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const BOX = { x: 0, y: -10, w: 10, h: 10 };
@@ -37,6 +38,13 @@ const MIMIC = {
     attack1: { ...def.attacks.attack1, hitCancel: null, mimic: { spawnAt: 0.1, offset: { x: 30, y: -60 }, siphon: 40 } },
   },
 };
+// The same mimic, letting go low (20 units up, as a small fighter's hand
+// does): a tall copy has to be lifted to clear the floor.
+const LOW = {
+  ...MIMIC,
+  id: 'test-mimic-low',
+  attacks: { ...MIMIC.attacks, attack1: { ...MIMIC.attacks.attack1, mimic: { spawnAt: 0.1, offset: { x: 30, y: -20 }, siphon: 40 } } },
+};
 // #0001 with no projectile of its own: nothing to copy.
 const EMPTY = { ...def, id: 'test-empty', attacks: { ...def.attacks, attack2: { ...def.attacks.attack1 }, midair_attack2: { ...def.attacks.midair_attack1 } } };
 delete EMPTY.projectiles;
@@ -47,8 +55,8 @@ EMPTY.actions = { attack1: def.actions.attack1, attack2: def.actions.attack1 };
 const after = (d, seconds, held = {}, targetHeld = {}) => {
   for (let i = 0; i < steps(seconds); i++) d.tick(held, targetHeld);
 };
-const versus = (target, opts = {}) => duel({
-  attackerCharacter: MIMIC, attackerSprites: fakeSpritesOf(MIMIC), targetCharacter: target, targetSprites: fakeSpritesOf(target), gap: 40, ...opts,
+const versus = (target, opts = {}, mimic = MIMIC) => duel({
+  attackerCharacter: mimic, attackerSprites: fakeSpritesOf(mimic), targetCharacter: target, targetSprites: fakeSpritesOf(target), gap: 40, ...opts,
 });
 const thrown = (d) => d.projectiles.filter((p) => p.owner === d.attacker);
 
@@ -141,6 +149,51 @@ test('a real hit copies the target\'s strongest projectile into the attacker\'s 
   assert.equal(d.attacker.combat.copy, null, 'out of its hands');
   assert.equal(d.attacker.attackDef('attack1'), d.attacker.attacks.attack1, 'a touch again');
   assert.ok(Math.abs(d.attacker.combat.cooldowns.get('attack1') - 5) < 0.2, 'its 5 s from the throw');
+});
+
+test('a copy too tall for its thrower leaves lifted clear of its feet, never lowered: it flies, never sunk into the floor it stands on', () => {
+  const shot = (h) => createProjectileDefinition({ id: 's', animation: 's', speed: 300, damage: 1, hitbox: { x: -10, y: -h / 2, w: 20, h } });
+  assert.deepEqual(throwOffset({ x: 30, y: -40 }, shot(20)), { x: 30, y: -40 }, 'a small one where the hand is');
+  assert.deepEqual(throwOffset({ x: 30, y: -40 }, shot(116)), { x: 30, y: -58 - COPY_FLOOR_CLEARANCE }, 'a tall one lifted, its box clear');
+  assert.deepEqual(throwOffset({ x: 30, y: -90 }, shot(116)), { x: 30, y: -90 }, 'never lowered');
+  // #0001's sphere, 116 units tall, thrown from the ground by a hand 20 units
+  // up: it flies on and strikes, where at the hand's height it would have
+  // met the floor.
+  const d = versus(def, {}, LOW);
+  d.tick(P('attack1'));
+  after(d, 0.4);
+  assert.equal(d.attacker.combat.copy?.id, 'attack5_object');
+  assert.equal(d.attacker.attackDef('attack1').projectile.offset.y, -58 - COPY_FLOOR_CLEARANCE);
+  d.target.body.x = d.attacker.body.x + 220;
+  after(d, 0.3);
+  d.tick(P('attack1'));
+  after(d, 0.2);
+  const [p] = thrown(d);
+  assert.ok(p?.alive, 'in flight');
+  const box = p.hitbox({});
+  assert.ok(box.y + box.h <= d.attacker.body.y - COPY_FLOOR_CLEARANCE + 1e-9, 'its whole box over her feet');
+  after(d, 0.6);
+  assert.ok(d.events.some((e) => e.attacker === d.attacker && e.source === 'projectile' && e.type === 'hit' && e.damage === 10), 'it struck');
+});
+
+test('every copy the roster offers, thrown from the ground by a hand low down, flies and strikes', () => {
+  for (const target of playableCharacters()) {
+    const d = versus(target, { gap: 34 }, LOW);
+    d.tick(P('attack1'));
+    after(d, 0.6);
+    const copy = d.attacker.combat.copy;
+    if (!copy) continue;
+    d.attacker.combat.setEnergy(100);
+    d.target.combat.launchPoint = 0;
+    after(d, 1.2);
+    d.target.body.x = d.attacker.body.x + 200;
+    d.target.body.vx = 0;
+    const from = d.events.length;
+    d.tick(P('attack1'));
+    after(d, 2.5);
+    const landed = d.events.slice(from).filter((e) => e.attacker === d.attacker && e.source === 'projectile');
+    assert.ok(landed.length > 0, `#${target.id}'s ${copy.id} flew and struck`);
+  }
 });
 
 test('an ordinary copy costs its throw 15 Energy, as any thrown construct; a throw cut short before it lets go keeps the copy', () => {

@@ -3575,7 +3575,10 @@ each fighter's own values are in its character specification (7.2.9).
     full bar (7.2.5). While its fighter holds a copy, a mimic of it, on the
     ground or in the air, throws that copy instead of striking: the same
     move, button, clip and phases, the copy leaving `offset` as `spawnAt`
-    crosses, the way the fighter faces: the projectile alone, never what
+    crosses, the way the fighter faces (lifted, never lowered, as far as
+    it takes to keep its whole box 2 units over the fighter's feet: a copy
+    sized for a taller thrower never sinks into the floor, where a
+    projectile is gone at once): the projectile alone, never what
     threw it, flying and striking as its thrower's does, in its own art at
     its thrower's art-pixel size, now this fighter's. The throw is built by
     the shared attack schema with the copy as its projectile

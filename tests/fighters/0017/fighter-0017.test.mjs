@@ -551,6 +551,34 @@ test('her next Finders Keepers throws the copy instead: the projectile alone, he
   assert.ok(d.attacker.combat.attack.def.hitbox, 'a poke again');
 });
 
+test('every shooter\'s copy, thrown on the ground and in the air, flies and strikes: one too tall for her hand leaves lifted clear of the floor', () => {
+  for (const target of playableCharacters()) {
+    for (const air of [false, true]) {
+      const d = touched(target.id);
+      const copy = d.attacker.combat.copy;
+      if (!copy) continue;
+      d.attacker.combat.setEnergy(100);
+      d.target.combat.launchPoint = 0;
+      after(d, 1.2);
+      d.target.body.x = d.attacker.body.x + 160;
+      d.target.body.vx = 0;
+      // In the air: just off the floor, where a tall copy would meet it too
+      // (her target stays on the ground: #0014's wave is a quake, meeting
+      // only fighters standing on it).
+      if (air) hold(d.attacker, 6);
+      const from = d.events.length;
+      d.tick(P('attack5'));
+      assert.equal(d.attacker.combat.attack?.def.id, air ? 'midair_attack5' : 'attack5', `#${target.id}`);
+      const offset = d.attacker.combat.attack.def.projectile.offset;
+      const hb = copy.def.hitbox;
+      assert.ok(offset.y + hb.y + hb.h < 0, `#${target.id}'s ${copy.id}: its box clear of her feet`);
+      after(d, 2.5);
+      const landed = d.events.slice(from).filter((e) => e.attacker === d.attacker && e.source === 'projectile');
+      assert.ok(landed.length > 0, `#${target.id}'s ${copy.id} ${air ? 'in the air' : 'on the ground'}: flew and struck`);
+    }
+  }
+});
+
 test('a copy that deals 10 earns its 5 s once thrown (no Energy), keeping the touch waiting; one that holds earns 3 s', () => {
   const d = touched('0007');
   d.target.body.x = d.attacker.body.x + 300;

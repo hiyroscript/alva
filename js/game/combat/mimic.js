@@ -5,8 +5,9 @@
 // js/game/combat/combat.js), their resolved projectiles and art.
 // Outputs: strongestProjectile (what a touch would copy off a fighter),
 // projectileStrength, mimicFrom (the copy, or the Energy taken instead),
-// mimicThrow (the attack that throws a held copy) and copyOf (the copy a
-// fighter holds, or null).
+// mimicThrow (the attack that throws a held copy), throwOffset and
+// COPY_FLOOR_CLEARANCE (where a copy leaves, clear of the floor) and copyOf
+// (the copy a fighter holds, or null).
 // Important constraints: nothing here names a fighter or a move. A copy is
 // the projectile alone, its own definition and its own art (never what
 // threw it), held by one fighter at a time (CombatState.copy) until a mimic
@@ -86,12 +87,32 @@ export function copyOf(fighter) {
   return fighter?.combat?.copy ?? null;
 }
 
+// World units a copy's box is kept clear of its thrower's feet as it
+// leaves (see throwOffset).
+export const COPY_FLOOR_CLEARANCE = 2;
+
+// Where a copy of projectile definition `def` leaves a mimic whose own
+// `offset` is `offset` (facing right from its fighter's origin): there,
+// unless its box would reach down to its fighter's feet. A copy was drawn
+// and sized for its own thrower: a sphere or a whirlwind as tall as a
+// fighter let go at a small fighter's shoulder would sink into the floor
+// it stands on, and a projectile that meets a solid block is gone on its
+// first step (see Projectile.update). So it is lifted, never lowered, as
+// far as it takes to keep the whole of its box COPY_FLOOR_CLEARANCE over
+// the feet, its middle still before the fighter's hand.
+export function throwOffset(offset, def) {
+  const hb = def.hitbox;
+  const lowest = -(hb.y + hb.h) - COPY_FLOOR_CLEARANCE;
+  return Object.freeze({ x: offset.x, y: Math.min(offset.y, lowest) });
+}
+
 // The attack mimic `touch` is while its fighter holds `copy`: the same
 // move, clip and phases, its strike gone and a throw of the copy in its
-// place, as `touch.mimic.spawnAt` crosses, from its `offset` (the
-// projectile's own definition and art carried along as `borrowed`, see
-// Projectile.release). Built by createAttackDefinition, judged with the
-// copy for its cooldown and its Energy, once per copy and touch.
+// place, as `touch.mimic.spawnAt` crosses, from its `offset` (lifted for a
+// copy too tall for it: see throwOffset; the projectile's own definition
+// and art carried along as `borrowed`, see Projectile.release). Built by
+// createAttackDefinition, judged with the copy for its cooldown and its
+// Energy, once per copy and touch.
 export function mimicThrow(touch, copy) {
   const built = copy.throws.get(touch.id);
   if (built) return built;
@@ -103,7 +124,7 @@ export function mimicThrow(touch, copy) {
     recovery: touch.recovery,
     hitbox: null,
     projectile: {
-      id: copy.id, spawnAt: touch.mimic.spawnAt, offset: touch.mimic.offset,
+      id: copy.id, spawnAt: touch.mimic.spawnAt, offset: throwOffset(touch.mimic.offset, copy.def),
       borrowed: Object.freeze({ def: copy.def, anim: copy.anim, sprites: copy.sprites, from: copy.from }),
     },
     groundOnly: touch.groundOnly,
