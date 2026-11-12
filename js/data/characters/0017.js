@@ -711,7 +711,9 @@ export const CHARACTER_0017 = {
     // Keepers, on the ground or in the air, throws that copy instead of
     // poking: the same clip, the copy leaving her fingertip 32 units
     // before her at her shoulder as her finger goes out (two fifteenths of
-    // a second in), the projectile alone, in its own art, flying and striking
+    // a second in; a copy too tall for that, a sphere or a whirlwind as
+    // tall as a fighter, lifted as far as it takes to clear the floor: see
+    // throwOffset in js/game/combat/mimic.js), the projectile alone, in its own art, flying and striking
     // exactly as its thrower's does, now hers. A target that throws nothing
     // gives up all its Energy (SIPHON_0017, to 0: exhausted) and every bit
     // of it comes to her. The touch costs nothing and has no cooldown; the

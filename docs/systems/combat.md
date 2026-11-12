@@ -28,7 +28,7 @@ techniques); Launch is its own guide
 | [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `FLOAT_RISE_SPEED`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
 | [`js/game/combat/offense.js`](../../js/game/combat/offense.js) | The attack classification: what a definition can do, apart from how it is executed (`attackOffense`, `projectileOffense`, `techniqueOffense`, `summonOffense`, `actionOffense`, `classifyHit`, `isHarmfulHit`, `resolveOffense`), the hit sources events name (`ATTACK_SOURCES`), and the refused Shield bypasses (`SHIELD_BYPASS_FIELDS`, `assertNoShieldBypass`). |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
-| [`js/game/combat/mimic.js`](../../js/game/combat/mimic.js) | Mimicry (an attack's `mimic`): `strongestProjectile` and `projectileStrength` (what a touch copies), `mimicFrom` (the copy, or the Energy taken instead), `mimicThrow` (the attack a held copy makes of its mimic), `copyOf`. |
+| [`js/game/combat/mimic.js`](../../js/game/combat/mimic.js) | Mimicry (an attack's `mimic`): `strongestProjectile` and `projectileStrength` (what a touch copies), `mimicFrom` (the copy, or the Energy taken instead), `mimicThrow` (the attack a held copy makes of its mimic), `throwOffset` and `COPY_FLOOR_CLEARANCE` (a copy kept clear of the floor as it leaves), `copyOf`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/data/cooldowns.js`](../../js/data/cooldowns.js) | The cooldown policy: `REPEAT_COOLDOWN`, `EXCEPTIONAL_COOLDOWN`, `TEN_DAMAGE_COOLDOWN`, `EXCEPTIONAL_EFFECTS` / `ROUTINE_EFFECTS`, `moveImpact`, `cooldownClass`, `policyCooldown`, `resolveCooldown`. |
@@ -387,7 +387,11 @@ today):
   throw of that copy instead (`mimicThrow`): the same move and button
   (its id, so its cooldown is the touch's), clip and phases, no strike of
   its own, the copy leaving `offset` (facing right, mirrored) the way the
-  fighter faces as `spawnAt` crosses, carried as `borrowed` to
+  fighter faces as `spawnAt` crosses (lifted, never lowered, as far as it
+  takes to keep the copy's whole box `COPY_FLOOR_CLEARANCE`, 2 units, over
+  the fighter's feet, `throwOffset`: a copy sized for a taller thrower
+  would otherwise sink into the floor and be gone on its first step),
+  carried as `borrowed` to
   `Projectile.release`: the projectile alone, never what threw it, flying
   and striking exactly as its thrower's does, in its own art at its
   thrower's art-pixel size, now this fighter's (its hits credit it, its

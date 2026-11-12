@@ -7267,3 +7267,32 @@ named nowhere); the hit event's shape (`launch`), the held-copy mark
 `strict-combat-rules`, `mash-combo`), `empty-roster`, `discover`,
 `practice-ground`, `watch-mode`, `settings` (her credit) and each
 fighter's roster list.
+
+### Later: every copy flies
+
+Reported after the merge: some copies did nothing, as if never thrown.
+Finders Keepers let every copy go at her hand, 30 units up (34 in the
+air), and the tallest copies the roster offers, drawn and sized for the
+fighters who throw them (#0001's sphere, 116 units tall, #0002's whirlwind,
+#0006's scream and #0015's tornado), reached down into the floor from
+there; a projectile that meets a solid block, the main floor included, is
+gone on its first step, so those four vanished as they appeared, on the
+ground (in the air, high enough, they flew). A copy now leaves lifted,
+never lowered, as far as it takes to keep its whole box 2 units over its
+thrower's feet (`throwOffset` and `COPY_FLOOR_CLEARANCE` in
+`js/game/combat/mimic.js`, used by `mimicThrow`): every copy the roster
+offers flies and strikes from the ground and from just off it. Checked in
+the real game against #0001, #0002, #0006, #0015, #0007 and #0009 (each
+copy thrown along the floor and striking, no console error), and in 60
+Brutal CPU matches as #0017 on every stage (161 copies thrown, none gone
+at once, no warning). Those four matchups measured again: #0017 now wins
+0.50 at Medium, 0.51 at Hard and 0.42 at Brutal (0.49, 0.49 and 0.42
+before), 18 of 24 against #0001 at Hard (12 before).
+
+**Tests:** `tests/systems/mimic.test.mjs` (a copy too tall for a low hand
+lifted clear of the feet, never lowered, #0001's sphere thrown low flying
+and striking; every roster copy thrown by a low hand flying and
+striking: both fail without the lift) and
+`tests/fighters/0017/fighter-0017.test.mjs` (every shooter's copy thrown
+by #0017 on the ground and just off it flying and striking, its box clear
+of her feet).
