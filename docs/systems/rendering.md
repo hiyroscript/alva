@@ -194,8 +194,11 @@ rotates, mirrors if the art travels the other way, and draws round the
 normalized anchor at the usual scale; with no rotation it draws exactly as
 it always has. It is art only: the hitbox, velocity, launches, pulls and
 clashes never turn, and being turned back (a repel or a Deflect) never
-resets it. A projectile is drawn at the art-pixel scale of the fighter
-whose art it is, whoever owns it now.
+resets it. #0018's grenade tumbles at 540, a turn and a half a second, as
+it is lobbed (its height changing along its `arc` is the simulation's: the
+art is drawn where it is, interpolated between steps like any
+projectile's position). A projectile is drawn at the art-pixel scale of
+the fighter whose art it is, whoever owns it now.
 
 ## Fighter status
 
@@ -234,7 +237,7 @@ ready timers draw nothing and leave no gap in the centered row.
 While a fighter performs one of its **Special abilities**
 ([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
-Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack, #0017's Earth Chop, Finders Keepers and Air Finders Keepers), a bright orange (`#ff9f1c`)
+Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift and Air Gift, #0016's Medipack, #0017's Earth Chop, Finders Keepers and Air Finders Keepers, #0018's Diary and Axe Swing), a bright orange (`#ff9f1c`)
 exclamation mark with a dark outline floats over it, centered above the
 top of its status column (its Energy bar while that shows, else its name
 tag: `Arena.specialMarkRect`, `specialMarkRect` in

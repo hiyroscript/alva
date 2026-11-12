@@ -238,6 +238,13 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 5,
       attack5: 0, midair_attack5: 0, extra_attack: 0, deflect: 0,
     },
+    // The Axe Swing: 10 at once. Her grenades' flash holds (3 s) and the
+    // Diary cloaks her (3 s); her lunge's backstab is 5, no 10, and her
+    // dive a motion: ordinary.
+    '0018': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 3, midair_attack3: 3, extra_attack: 0,
+      deflect: 0, attack4: 3, attack5: 5,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

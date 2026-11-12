@@ -611,7 +611,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0014](../characters/0014.md#controller-layout),
 [#0015](../characters/0015.md#controller-layout),
 [#0016](../characters/0016.md#controller-layout),
-[#0017](../characters/0017.md#controller-layout).
+[#0017](../characters/0017.md#controller-layout),
+[#0018](../characters/0018.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -649,6 +650,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0016 air | Air Kick | | | Air Twin Pistols | | up: Grapple |
 | #0017 ground | Spin Kick | Stick Poke | | Finders Keepers | Earth Chop | forward: Kiiin!; up: Rocket Headbutt |
 | #0017 air | Somersault Headbutt | | | Air Finders Keepers | | up: Air Rocket Headbutt; down: Headbutt Dive |
+| #0018 ground | Kitchen Knife | Katana Draw | Axe Swing | Flash Grenade | Diary | forward: Stalker's Lunge |
+| #0018 air | Air Katana | | | Air Flash Grenade | | forward: Stalker's Dive |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -684,8 +687,9 @@ Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
 Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
 #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's
 Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's
-Gift and Air Gift, #0016's Medipack and #0017's Earth Chop, Finders
-Keepers and Air Finders Keepers, each tagged Ground or Air. Every other move, a
+Gift and Air Gift, #0016's Medipack, #0017's Earth Chop, Finders
+Keepers and Air Finders Keepers, and #0018's Diary and Axe Swing, each
+tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

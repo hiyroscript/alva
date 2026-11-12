@@ -285,8 +285,9 @@ export class Perception {
   }
 
   // The projectiles the CPU can see now, as it sees them: { p, owner, dir,
-  // x, y, vx, def, age, known } (projectiles younger than its latency are
-  // not seen yet).
+  // x, y, vx, vy, def, age, known } (projectiles younger than its latency
+  // are not seen yet; `vy` a lobbed one's speed up or down, 0 for one that
+  // flies straight).
   perceivedShots(clock, out = []) {
     out.length = 0;
     for (const tr of this.shots.values()) {
@@ -296,7 +297,7 @@ export class Perception {
       const dir = stale ? tr.prevDir : tr.dir;
       const owner = stale ? tr.prevOwner : tr.owner;
       const x = stale ? tr.x0 + dir * p.speed * (clock - tr.changedAt) : p.x;
-      out.push({ p, owner, dir, x, y: p.y, vx: dir * p.speed, def: p.def, age: p.age, hits: p.hits, ready: p.ready });
+      out.push({ p, owner, dir, x, y: p.y, vx: dir * p.speed, vy: p.vy ?? 0, def: p.def, age: p.age, hits: p.hits, ready: p.ready });
     }
     return out;
   }

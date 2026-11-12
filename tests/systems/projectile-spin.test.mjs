@@ -28,14 +28,18 @@ function recorder() {
 // A frame as the normalizer leaves it.
 const FRAME = { canvas: {}, artW: 30, artH: 20, anchorArtX: 15, anchorArtY: 10 };
 
-test('rotationSpeed is 0 unless authored; #0001\'s Red, Maximum Blue and Hollow Purple spin six turns a second', () => {
+test('rotationSpeed is 0 unless authored; #0001\'s Red, Maximum Blue and Hollow Purple spin six turns a second, #0018\'s grenade a turn and a half', () => {
   assert.equal(createProjectileDefinition({ id: 'plain', damage: 1 }).rotationSpeed, 0);
   assert.throws(() => createProjectileDefinition({ id: 'bad', damage: 1, rotationSpeed: 'fast' }), /degrees per second/);
   for (const id of ORBS) assert.equal(DEF_0001.projectiles[id].rotationSpeed, 2160, id);
+  // #0018's grenade tumbles as it is lobbed, a turn and a half a second, on
+  // the ground and in the air.
+  const DEF_0018 = CHARACTERS.find((c) => c.id === '0018');
+  for (const id of ['attack3_object', 'midair_attack3_object']) assert.equal(DEF_0018.projectiles[id].rotationSpeed, 540, id);
   // Every other projectile is as it was: unrotated.
   for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
     for (const [id, p] of Object.entries(c.projectiles ?? {})) {
-      if (c === DEF_0001) continue;
+      if (c === DEF_0001 || c === DEF_0018) continue;
       assert.equal(createProjectileDefinition({ id, ...p }).rotationSpeed, 0, `#${c.id} ${id}`);
     }
   }

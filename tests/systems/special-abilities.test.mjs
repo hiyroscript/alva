@@ -60,11 +60,12 @@ const SPECIALS = Object.freeze({
   '0015': ['attack3', 'midair_attack3'],
   '0016': ['attack5'],
   '0017': ['attack4', 'attack5', 'midair_attack5'],
+  '0018': ['attack4', 'attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly twenty-seven Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent, the Emergency Meeting, Camouflage, the Venom Punch, Dragonblade, the Twin Lion Fists, the Sixty-Four Palms, Sunburst Fist, the Gift, the Air Gift, the Medipack, the Earth Chop, Finders Keepers and the Air Finders Keepers', () => {
+test('exactly twenty-nine Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent, the Emergency Meeting, Camouflage, the Venom Punch, Dragonblade, the Twin Lion Fists, the Sixty-Four Palms, Sunburst Fist, the Gift, the Air Gift, the Medipack, the Earth Chop, Finders Keepers, the Air Finders Keepers, the Diary and the Axe Swing', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -74,7 +75,7 @@ test('exactly twenty-seven Specials across the roster: Unlimited Void and Hollow
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 27);
+  assert.equal(total, 29);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
@@ -150,6 +151,15 @@ test('exactly twenty-seven Specials across the roster: Unlimited Void and Hollow
   assert.equal(actionType(getCharacter('0017'), 'attack4'), 'technique');
   for (const move of ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3', 'extra_attack']) {
     assert.equal(isSpecialAbility(getCharacter('0017'), move), false, `${name('0017', move)} is not Special`);
+  }
+  assert.deepEqual(specialAbilities(getCharacter('0018')).map((m) => name('0018', m)), ['Diary', 'Axe Swing']);
+  // Her diary and her slipping out of sight, and her axe, both techniques;
+  // her knife, katana, lunge, dive and grenade are her everyday tools:
+  // ordinary.
+  assert.equal(actionType(getCharacter('0018'), 'attack4'), 'technique');
+  assert.equal(actionType(getCharacter('0018'), 'attack5'), 'technique');
+  for (const move of ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3', 'extra_attack']) {
+    assert.equal(isSpecialAbility(getCharacter('0018'), move), false, `${name('0018', move)} is not Special`);
   }
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
   for (const move of ['attack3', 'attack4']) {
@@ -282,6 +292,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
       air: ['attack1', 'attack2', 'attack3'],
       abilities: ['ground:attack4', 'ground:attack5', 'air:attack5'],
+    },
+    '0018': {
+      ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack4', 'ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

@@ -30,6 +30,7 @@ import { CONFIG } from '../../../config.js';
 import { stepBody } from '../../physics.js';
 import { steer, attackDrift, activationStep, attackStartSpeed, groundJump, airJump, tunnelExit } from '../../fighters/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
+import { projectileDrop } from '../../combat/projectile.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
 export const STEP = CONFIG.sim.step;
@@ -492,7 +493,10 @@ export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out =
   for (let j = 0; j < life; j++) {
     const k = startK + j;
     const px = x0 + dir * p.speed * (j + 1) * STEP;
-    boxAt(p.hitbox, px, y0, dir, shotBox);
+    // A lobbed one (`arc`) rises and falls on its curve; one that flies
+    // straight keeps its height.
+    const py = y0 + projectileDrop(p.def ?? p, (j + 1) * STEP);
+    boxAt(p.hitbox, px, py, dir, shotBox);
     if (shotBox.x + shotBox.w < v.left || shotBox.x > v.right) break;
     if (stage.solids.some((s) => s.active !== false && shotBox.x < s.x + s.w && shotBox.x + shotBox.w > s.x && shotBox.y < s.y + s.h && shotBox.y + shotBox.h > s.y)) {
       out.blocked = true;
@@ -506,7 +510,7 @@ export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out =
     let fy = foe.y[fk] + dragY;
     if (pull) {
       const cx = px + dir * (pull.offset?.x ?? 0);
-      const cy = y0 + (pull.offset?.y ?? 0);
+      const cy = py + (pull.offset?.y ?? 0);
       const ddx = cx - fx;
       const ddy = cy - (fy + midY);
       const d = Math.hypot(ddx, ddy);

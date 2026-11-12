@@ -516,7 +516,13 @@ technique's burst and heal, its summon's clone, whether a
 hit is a quake or a gaze, its cooldowns and air uses. A ranged move's
 shot may fly or, with no speed, stand where it appears for its lifetime
 (#0009's Earth Pillar): `readMoveset` reads both, and the shot's path is
-then where it stands. A mimic (#0017's Finders Keepers,
+then where it stands. A lobbed shot (`arc`, #0018's Flash Grenade) is
+predicted along the very curve the game flies it on (`projectileDrop` in
+[`projectile.js`](../../js/game/combat/projectile.js)): `projectileContact`
+when the CPU weighs throwing one, and its threats (`projectileThreat`,
+`hitsAt`, `deflectTiming`) from a live one's height and speed up or down
+(`vy`, as the CPU sees it) when it answers one, so a lob that will sail
+over its head or fall short is no threat and one coming down on it is. A mimic (#0017's Finders Keepers,
 [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)) is read as
 what it is right now (`Fighter.attackDef`): a melee touch, valued by what
 it would take from its opponent (the definition of the opponent's

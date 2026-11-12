@@ -178,7 +178,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0017 use them between them
+is built, and usable by any fighter (#0001 to #0018 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -489,6 +489,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0015 | `['attack3', 'midair_attack3']` | the Gift and the Air Gift (a present left on the floor or in the air that waits for the first opponent to touch it, one at a time) | the Pink Typhoon's tornado (it pulls, carries and throws), the Girl Dunk's shockwave, its hammer and its gloves |
 | #0016 | `['attack5']` | the Medipack (a kneel any blow breaks that heals her) | the Silent Arrow (a technique: an arrow with a backstab), the Twin Pistols (a volley), the Grapple (a lift that pulls), her kicks |
 | #0017 | `['attack4', 'attack5', 'midair_attack5']` | the Earth Chop (a 10-damage quake round her after a breakable wind-up), Finders Keepers and the Air Finders Keepers (a touch that copies the opponent's strongest projectile for her to throw, or takes all its Energy) | Kiiin! (a roll), the Headbutt Dive (a plunge that lands), the Rocket Headbutt (a lift), her kick and her stick |
+| #0018 | `['attack4', 'attack5']` | the Diary (out of sight: a cloak, a CPU losing track of her, until she strikes or is struck), the Axe Swing (a 10-damage swing that sends its target sky-high and shoves a raised guard back, after a breakable wind-up) | the Flash Grenade (a lob whose flash holds whoever sees it), the Stalker's Lunge and Dive (a roll and a homing dive, each with a backstab), her knife and her katana |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -597,9 +598,9 @@ entry (once, or `count` times in a row for a
 `finisher` (its last strike), `pull: { radius, speed, front }`, `repel`, `erase`
 and the hit effects, and `rotationSpeed` (degrees per second its art
 spins as it flies, clockwise; 0, the default, is none: art only, see
-[rendering](rendering.md#projectile-spin)), and `maxInPlay` (below). A projectile flies straight
+[rendering](rendering.md#projectile-spin)), `arc` (below) and `maxInPlay` (below). A projectile flies straight
 in the direction its
-thrower faced at the release (one with no `speed` stays where it appears,
+thrower faced at the release (a lobbed one along its curve that way) (one with no `speed` stays where it appears,
 an obstacle: #0004's dancing double, #0015's present), never turns, hits once by default (a
 piercing one up to its `hits`, an erasing one each fighter it hits once,
 flying on through), and is gone on a block (any projectile, an erasing or
@@ -613,6 +614,22 @@ rank that act both go; two that do neither pass each other by. A live
 Deflect turns one back the same way (`Projectile.turnBack`), whatever it
 is: away from the deflecting fighter, its strikes starting over, the rest
 of its lifetime kept.
+
+**Lobbed** (`arc: { lift, gravity }`; null, the default, flies
+straight): it leaves going up at `lift` units/s (0: level) and falls at
+`gravity` units/s every second, its `speed` still carrying it the way it
+was thrown, so it rises and comes down ahead of its thrower, passing over
+whoever is too near. Its height is exactly `projectileDrop`'s curve (from
+the release, `vy` its launch's, `projectileLaunchVy`), step for step, and
+the CPU predicts it on the same curve (`projectileContact`, its threats).
+It lands on nothing: the floor ends it as any solid ends any shot, and a
+one-way platform never stops it. Turned back, it keeps falling where it
+was. A lob needs a `speed`; anything but a lift of 0 or more and a
+positive gravity is refused. #0018's Flash Grenade (and its air version,
+dropped level). A gaze projectile (its hit a `gaze`) is seen, or not, from
+the side it comes from, the way it travels, wherever over the fighter it
+happens to be: a lob dropping past a fighter's middle, or a shot flying on
+past one turned away, never reaches the front of one with its back to it.
 
 **One at a time** (`maxInPlay`, a whole number; 0, the default, is no
 bound): its thrower never has more than that many of its move's
@@ -886,7 +903,8 @@ Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10);
 #0013's Sixty-Four Palms 5 s (its flurry's 10); #0014's Sunburst Fist 5 s
 (its punch's 10); #0016's Medipack 3 s (its heal); #0017's Earth Chop 5 s
-(its quake's 10).
+(its quake's 10); #0018's Flash Grenade and Air Flash Grenade 3 s (their
+flash's hold), Diary 3 s (a cloak) and Axe Swing 5 s (its swing's 10).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -910,7 +928,10 @@ Pistols' four shots add up to 4, the Silent Arrow's backstab of 5 is no
 10, the Grapple is a lift that pulls), and of #0017's but the Earth Chop
 (Finders Keepers' touch copies or takes Energy, routine; Kiiin! rolls, the
 Headbutt Dive and the Rocket Headbutt are motions; a copy she throws earns
-whatever it does, so a thrown rocket waits 5 s), and every Deflect none.
+whatever it does, so a thrown rocket waits 5 s), and of #0018's but her
+grenades, the Diary and the Axe Swing (the Stalker's Lunge and Dive are a
+roll and a homing dash, their backstab of 5 no 10), and every Deflect
+none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
