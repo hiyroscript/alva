@@ -1,0 +1,76 @@
+# Android debug APK and iOS Simulator build. Signed iOS distribution requires
+# the owner's Apple signing certificate and provisioning profile.
+name: Native mobile builds
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the existing game build tools
+        run: npm ci
+      - name: Install Capacitor
+        run: npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
+      - name: Build the self-contained mobile game
+        run: npm run build:mobile
+      - name: Generate and sync the Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+          node tools/native/prepare-platforms.mjs
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alva-android-debug-\${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  ios-simulator:
+    name: iOS Simulator app
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the existing game build tools
+        run: npm ci
+      - name: Install Capacitor
+        run: npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/ios@latest
+      - name: Build the self-contained mobile game
+        run: npm run build:mobile
+      - name: Generate and sync the iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+          node tools/native/prepare-platforms.mjs
+      - name: Build for the iOS Simulator
+        run: xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator -configuration Release -derivedDataPath build/ios build CODE_SIGNING_ALLOWED=NO
+      - name: Archive simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/Build/Products/Release-iphonesimulator/App.app alva-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alva-ios-simulator-\${{ github.sha }}
+          path: alva-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 30
