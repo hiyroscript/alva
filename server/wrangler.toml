@@ -61,7 +61,7 @@ new_sqlite_classes = ["Lobby", "Room"]
 # Comma-separated; * stands for any host labels before the domain, or any
 # port. Change it here and deploy again (merging into main does it when
 # Cloudflare deploys from GitHub); no code changes.
-ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*"
+ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*,https://localhost,capacitor://localhost,alva://app"
 
 # Staying inside Cloudflare's free Workers plan (checked on 2026-11-03:
 # https://developers.cloudflare.com/durable-objects/platform/pricing/). Its
