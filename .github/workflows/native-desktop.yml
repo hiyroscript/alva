@@ -13,8 +13,8 @@ permissions:
 
 jobs:
   desktop:
-    name: \${{ matrix.name }}
-    runs-on: \${{ matrix.os }}
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     strategy:
       fail-fast: false
@@ -44,11 +44,11 @@ jobs:
       - name: Build the self-contained game
         run: npm run build:desktop
       - name: Package the desktop application
-        run: npx electron-builder \${{ matrix.target }}
+        run: npx electron-builder ${{ matrix.target }}
       - name: Keep installers
         uses: actions/upload-artifact@v4
         with:
-          name: alva-desktop-\${{ matrix.os }}-\${{ github.sha }}
+          name: alva-desktop-${{ matrix.os }}-${{ github.sha }}
           path: dist/installers/*
           if-no-files-found: error
           retention-days: 30
