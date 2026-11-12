@@ -30,7 +30,7 @@
       "package.json"
     ],
     "asar": true,
-    "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
     "win": {
       "target": [
         {
@@ -76,5 +76,6 @@
       ],
       "category": "Game"
     }
-  }
+  },
+  "version": "0.1.0"
 }
