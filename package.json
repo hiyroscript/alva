@@ -1,13 +1,81 @@
 {
   "name": "alva",
   "private": true,
-  "description": "Alva, a 2D sprite fighting game for the browser. The game itself needs nothing installed; esbuild is only for the optional itch.io release export.",
+  "description": "Alva, a 2D sprite fighting game for the browser and native desktop/mobile applications.",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "build:itch": "node tools/itch/build.mjs",
-    "verify:itch": "node tools/itch/equivalence.mjs"
+    "verify:itch": "node tools/itch/equivalence.mjs",
+    "build:desktop": "node tools/native/build-desktop.mjs",
+    "package:desktop": "electron-builder",
+    "package:desktop:win": "npm run build:desktop && electron-builder --win nsis --x64",
+    "build:mobile": "node tools/native/build-mobile.mjs",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios"
   },
   "devDependencies": {
     "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "com.hiyroscript.alva",
+    "productName": "Alva",
+    "electronVersion": "latest",
+    "directories": {
+      "output": "dist/installers"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/desktop/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Game"
+    }
   }
 }
