@@ -25,6 +25,14 @@ jobs:
           cache: npm
       - name: Install the existing game build tools
         run: npm ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Run the game and server tests
+        run: node --test
+      - name: Run the game and server tests
+        run: node --test
       - name: Install Capacitor
         run: npm install --no-save --package-lock=false @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
       - name: Build the self-contained mobile game
