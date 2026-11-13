@@ -163,3 +163,14 @@ test('the release workflow: a new entry or a person starts it, one at a time, bu
   assert.match(apps, /A release needs the release key/);
   assert.match(apps, /collect\.mjs android \$\{\{ inputs\.release && '--release' \|\| '' \}\}/);
 });
+
+test('a change to the room server on main deploys it, at the released version only, never during a release, never without its key', () => {
+  const yml = read('.github/workflows/room-server.yml');
+  assert.match(yml, /on:\n  push:\n    branches: \[main\]\n    paths: \['server\/\*\*'\]/);
+  assert.match(yml, /concurrency:\n  group: release\n  cancel-in-progress: false/, 'the release\'s queue');
+  assert.match(yml, /is not a released version/);
+  assert.match(yml, /npm ci && npm test/, 'the server\'s tests first');
+  assert.match(yml, /Not deployed: the secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set/);
+  const deploy = yml.indexOf('npx wrangler deploy');
+  assert.ok(deploy > yml.indexOf('Only the released version') && deploy > yml.indexOf('npm test'));
+});

@@ -285,7 +285,11 @@ Native apps for Windows, macOS, Linux and Android wrap that same release
 `npm run build:android`), installed from their own installers, with no
 app store. Every pull request builds all of them and keeps the installers
 on the run (`.github/workflows/native-apps.yml`). Their version is
-`package.json`'s, and Online Play only plays on the current version. More
+`package.json`'s, and Online Play only plays on the current version.
+Releases are automatic: a new entry in `UPDATES.md` pushed to `main`
+publishes the next version on <https://github.com/hiyroscript/alva/releases/latest>
+(every installer, the itch.io ZIP, their checksums), pushes it to itch.io
+and updates the room server last (`.github/workflows/release.yml`). More
 in [the native apps](docs/development/native-apps.md).
 
 ## Controls

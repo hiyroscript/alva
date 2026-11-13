@@ -79,5 +79,13 @@ and add an entry there when the owner names a new one.
   (`ALLOWED_SOUNDS` in `js/core/audio/sounds.js`). Only the owner adds to
   the list. Sound only listens to the game, never feeds back, and never
   names a fighter ([audio](./docs/systems/audio.md)).
+- **Releases are automatic** ([the native apps](./docs/development/native-apps.md#releases)):
+  a new `## ` entry in `UPDATES.md` pushed to `main` releases the next
+  version (`.github/workflows/release.yml`); a later addition to an
+  entry goes in as a `### ` subsection, which releases nothing. When the
+  owner says "release X.Y.Z", run the Release workflow by hand
+  (`workflow_dispatch` on `main`, input `version` X.Y.Z) and reply with
+  just https://github.com/hiyroscript/alva/releases/latest once it is
+  published.
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).
