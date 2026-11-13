@@ -7676,11 +7676,16 @@ deployed with the new version and its `/health` checked. A release missing
 any of its six secrets is held before anything is built; one that fails
 before it is published leaves no draft or branch behind; two never run at
 once. "Run workflow" with **test** builds everything into a draft, checks
-it and removes it. This part is a subsection rather than an entry of its
+it and removes it, and so does every pull request that changes the release
+itself. A merge that changes `server/` deploys the room server from GitHub
+(`.github/workflows/room-server.yml`, at the released version only), as
+Cloudflare's own deploy did before it was turned off for the releases. This part is a subsection rather than an entry of its
 own on purpose: an entry would itself start a release.
 
 **Code:** `tools/native/release.mjs` (new: the plan, the version rules, the
 notes, the version files, the files attached and their checksums),
 `tools/native/collect.mjs` (`--release`), `.github/workflows/release.yml`
-(new), `.github/workflows/native-apps.yml` (`workflow_call`).
+and `room-server.yml` (new), `.github/workflows/native-apps.yml`
+(`workflow_call`); the guide's Releases and How to install, the room
+server's Deploys, `README.md` and `CLAUDE.md` ("release X.Y.Z").
 **Tests:** new `tests/interface/native-releases.test.mjs`.

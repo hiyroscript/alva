@@ -131,6 +131,10 @@ test('the release workflow: a new entry or a person starts it, one at a time, bu
   const yml = read('.github/workflows/release.yml');
   assert.match(yml, /on:\n  push:\n    branches: \[main\]\n    paths: \[UPDATES\.md\]\n  workflow_dispatch:\n    inputs:\n      version:/);
   assert.match(yml, /concurrency:\n  group: release\n  cancel-in-progress: false/);
+  // A test release for a pull request that changes the release; a real one
+  // only on main.
+  assert.match(yml, /  pull_request:\n    paths: \[\.github\/workflows\/release\.yml, tools\/native\/release\.mjs\]/);
+  assert.match(yml, /if \[ "\$\{\{ github\.ref \}\}" = "refs\/heads\/main" \] && \[ "\$\{\{ inputs\.test \}\}" != "true" \]; then test=false; else test=true; fi/);
   // Held without any of the six secrets, before anything is built.
   for (const name of ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID']) {
     assert.match(yml, new RegExp(`for name in [^\\n]*\\b${name}\\b`), name);

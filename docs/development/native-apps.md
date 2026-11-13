@@ -361,7 +361,10 @@ workflow's own token, and adds no entry).
 (empty: the next patch). Its notes are the newest entry. Ticking **test**
 (or running it on any other branch) makes a **test release**: everything
 built and attached to a draft, checked, then removed, with the server's
-deploy only a dry run; nothing is pushed, published, uploaded or deployed.
+deploy only a dry run; nothing is pushed to `main`, published, uploaded or
+deployed. A pull request that changes the release itself
+(`release.yml`, `tools/native/release.mjs`) makes one too, so the whole
+release is tried before the change is merged.
 
 ## How to install
 

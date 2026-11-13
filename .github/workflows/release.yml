@@ -26,15 +26,16 @@
 # releases never run at once. The release commit is pushed with the
 # workflow's own token, which starts no other workflow, and adds no entry.
 #
-# A run on any branch but main, or with "test" ticked, is a test release:
-# everything built and attached to a draft, checked, then removed; nothing
-# pushed, published, uploaded or deployed (the server's deploy is a dry run).
+# A run on any branch but main, with "test" ticked, or for a pull request
+# that changes the release itself, is a test release: everything built and
+# attached to a draft, checked, then removed; nothing pushed to main,
+# published, uploaded or deployed (the server's deploy is a dry run).
 
 name: Release
 
 on:
   push:
-    branches: [main, claude/intelligent-cannon-kdwsgw]
+    branches: [main]
     paths: [UPDATES.md]
   workflow_dispatch:
     inputs:
@@ -46,6 +47,10 @@ on:
         description: A test release (a draft, built, checked and removed; nothing published).
         type: boolean
         default: false
+  # A pull request that changes the release itself makes a test release, so
+  # the whole of it is tried before it is merged.
+  pull_request:
+    paths: [.github/workflows/release.yml, tools/native/release.mjs]
 
 permissions:
   contents: write
@@ -57,6 +62,8 @@ concurrency:
 jobs:
   plan:
     name: Plan
+    # A pull request from a fork has no right to draft a release here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
