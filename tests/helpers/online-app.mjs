@@ -11,7 +11,7 @@
 
 import { fakeSprites, DT } from './fighter-harness.mjs';
 import { padSource } from './fake-gamepad.mjs';
-import { makeEnv, FakeSocket, ITCH } from '../../server/tests/fakes.mjs';
+import { makeEnv, FakeSocket, ITCH, VERSION } from '../../server/tests/fakes.mjs';
 import worker from '../../server/src/index.js';
 
 const noop = () => {};
@@ -187,7 +187,7 @@ const { InputManager } = await import('../../js/core/input-manager.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const online = await import('../../js/screens/online-screens.js');
 const { OnlineBattleScreen } = await import('../../js/screens/online-battle-screen.js');
-const { OnlineSession, ONLINE_VERSION } = await import('../../js/online/online-session.js');
+const { OnlineSession } = await import('../../js/online/online-session.js');
 const { RoomServerClient } = await import('../../js/online/server-client.js');
 const { memoryTransportPair } = await import('../../js/online/transport.js');
 const { LockstepSession } = await import('../../js/online/lockstep.js');
@@ -195,6 +195,11 @@ const { readStart } = await import('../../js/online/match-setup.js');
 const { Battle } = await import('../../js/game/battle.js');
 
 export const SERVER_URL = 'https://alva-rooms.test.workers.dev';
+// The version both players' games are: the release the server plays with
+// (its CURRENT_VERSION), as itch.io's page and the native apps are built
+// (the modules run as they are here would be 'dev', which the server lets
+// in only from a computer's own address).
+export const RELEASE = VERSION;
 export const settle = () => new Promise((resolve) => setImmediate(resolve));
 export async function settleAll(n = 6) {
   for (let i = 0; i < n; i++) await settle();
@@ -314,7 +319,7 @@ export function otherPlayer(server, hub, { name = 'Sam' } = {}) {
   const session = new OnlineSession({
     client: new RoomServerClient({ baseUrl: SERVER_URL, fetchImpl: server.fetchImpl, WebSocketImpl: server.WebSocket }),
     ...(hub ? { peerFactory: hub.factory } : {}),
-    version: ONLINE_VERSION,
+    version: RELEASE,
   });
   session.name = name;
   const events = [];
@@ -351,8 +356,11 @@ export function otherSide(player, start, { script = () => null, clock } = {}) {
 
 // The app: Home, the online screens and the online battle, over `server`
 // (`serverUrl` empty: none configured), its connectivity `online` (a fake that the
-// test switches: connectivity.set(false)), the peer `hub`.
-export function boot({ server = backend(), hub = peerHub(), serverUrl = SERVER_URL, settings = new Settings(null), isOnline = true } = {}) {
+// test switches: connectivity.set(false)), the peer `hub`, its game's
+// `version` (the release's by default).
+export function boot({
+  server = backend(), hub = peerHub(), serverUrl = SERVER_URL, settings = new Settings(null), isOnline = true, version = RELEASE,
+} = {}) {
   // An earlier boot's input stops listening.
   windowListeners.clear();
   const loading = { error: null, show: noop, hide: noop, setProgress: noop, showError(message, opts) { this.error = { message, opts }; } };
@@ -393,6 +401,7 @@ export function boot({ server = backend(), hub = peerHub(), serverUrl = SERVER_U
     client: new RoomServerClient({ baseUrl: serverUrl, fetchImpl: server.fetchImpl, WebSocketImpl: server.WebSocket }),
     ...(hub ? { peerFactory: hub.factory } : {}),
     settings,
+    version,
   });
   app.screens = new ScreenManager(app);
   app.nav = new MenuNavigator(app);

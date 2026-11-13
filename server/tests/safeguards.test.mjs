@@ -3,8 +3,9 @@
 // rooms with both players at once (a host waiting alone counts for
 // nothing), the monthly safety stop that closes Online play until the next
 // month once the month's estimated relay use reaches RELAY_MONTHLY_GB, at
-// most RELAY_PASSWORDS_PER_HOUR relay passwords an hour, and ONLINE_OPEN,
-// the switch that closes Online play.
+// most RELAY_PASSWORDS_PER_HOUR relay passwords an hour, ONLINE_OPEN,
+// the switch that closes Online play, and a release replacing the version
+// rooms were made for.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -239,4 +240,27 @@ test('wrangler.toml: 10 matches at once, a safety stop under half the free 1,000
   assert.doesNotMatch(toml, /expressturn|TURN_URLS|TURN_USERNAME|TURN_CREDENTIAL/i);
   assert.match(toml, /TURN_KEY_ID/);
   assert.match(toml, /TURN_KEY_API_TOKEN/);
+});
+
+test('a release replaces the version: an open room of the old one closes as outdated, at its next connection or relay request', async () => {
+  const made = makeEnv();
+  const { env } = made;
+  const open = await pairedRoom(made);
+  const waiting = await makeRoom(env);
+  // The release: the server now plays with 1.0.1 (wrangler.toml's
+  // CURRENT_VERSION, deployed last).
+  env.CURRENT_VERSION = '1.0.1';
+  // The open room: its next relay request closes it, both players told.
+  await open.say(open.host, { type: 'relay' });
+  for (const ws of [open.host, open.guest]) assert.deepEqual(ws.of('closed'), [{ type: 'closed', reason: 'outdated' }]);
+  // The waiting one closes when its host reconnects (a deploy drops every
+  // room's sockets), and the Lobby forgets it.
+  const ws = new FakeSocket();
+  await made.room(waiting.room.id).connect('host', ws);
+  assert.deepEqual(ws.of('closed'), [{ type: 'closed', reason: 'outdated' }]);
+  assert.equal(made.lobby().rooms[waiting.room.id], undefined);
+  // The old version is refused everywhere; the new one plays.
+  assert.deepEqual(await answer(await handle(gameRequest('/rooms'), env)), { status: 409, error: 'outdated' });
+  assert.equal((await handle(gameRequest('/rooms', { version: '1.0.1' }), env)).status, 200);
+  assert.equal((await post(env, '/rooms', createBody({ version: '1.0.1' }), '10.9.0.1')).status, 200);
 });

@@ -31,7 +31,9 @@
 // the home screen, with the browser's own installation where it offers one.
 // Its arrow drops into its tray every few seconds to draw the eye (CSS
 // only: still with reduced motion, paused while the dialog is open, and
-// gone once Alva is installed).
+// gone once Alva is installed). Inside one of the native apps
+// (js/core/native-shell.js) Alva is installed already, so there is no
+// Download at all.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -42,6 +44,7 @@ import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
 import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';
 import { playableCharacters } from '../data/characters.js';
+import { isNativeApp } from '../core/native-shell.js';
 
 // The Home actions that start a match, and so need a playable fighter, and
 // the id of the note that says why they are closed. Local play needs two
@@ -271,10 +274,12 @@ export class HomeScreen extends Screen {
 
     // Download: the install dialog over Home (js/ui/install-dialog.js),
     // focus back here when it closes. Reached by Tab, keyboard and
-    // controller navigation like the other Home chrome.
+    // controller navigation like the other Home chrome. Hidden in a native
+    // app (out of every navigation with it).
     this.downloadButton = el('button', {
       class: 'home-download', type: 'button', 'data-nav': true, 'data-home-download': true, 'aria-haspopup': 'dialog',
       ...tattr('aria-label', 'home.download'), ...tattr('title', 'install.title'), html: ICONS.download,
+      hidden: isNativeApp(),
     });
     this.downloadButton.addEventListener('click', () => app.installDialog?.open({ opener: this.downloadButton }));
     app.install?.onChange(() => this.syncInstallState());

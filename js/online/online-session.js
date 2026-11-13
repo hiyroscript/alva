@@ -51,11 +51,14 @@ const RECONNECT_DELAYS_MS = Object.freeze([1000, 2500, 5000]);
 
 const otherSeat = (seat) => (seat === 'host' ? 'guest' : 'host');
 
-// The version a copy of the game plays online as: the game's, marked as one
-// whose matches go through a TURN relay, so it never shares a room with an
-// older copy that connected straight to the other browser or through the
-// room ("Other version").
-export const ONLINE_VERSION = `${CONFIG.version}+turn`;
+// The version a copy of the game plays online as: the release's own
+// (CONFIG.version, package.json's, written in by the release build; 'dev'
+// for the modules run as they are). It goes with the reachability check,
+// the list, creating and joining, and the room server refuses any but its
+// current version ('outdated': "A new version of Alva is out"), 'dev' only
+// from a computer's own address. A room keeps its host's, so two versions
+// never share a match ("Other version").
+export const ONLINE_VERSION = CONFIG.version;
 
 export class OnlineSession {
   constructor({
@@ -125,19 +128,27 @@ export class OnlineSession {
 
   // ---- The server ---------------------------------------------------------------
 
-  // Whether the server answers at all (the name screen asks before the
-  // lobby): throws an OnlineError ('unavailable', 'rate_limited', …).
+  // Whether this page can link to another player at all (a WebRTC peer
+  // connection: js/online/match-link.js); a link factory that does not say
+  // (the tests') can.
+  get linkSupported() {
+    return this.peerFactory?.supported?.() ?? true;
+  }
+
+  // Whether the server answers at all and plays with this version (the
+  // name screen asks before the lobby): throws an OnlineError
+  // ('unavailable', 'outdated', 'rate_limited', …).
   async probe() {
-    return this.client.listRooms();
+    return this.client.listRooms({ version: this.version });
   }
 
   // Why the server cannot be used now (RoomServerClient.diagnose).
   diagnose() {
-    return this.client.diagnose();
+    return this.client.diagnose({ version: this.version });
   }
 
   listRooms() {
-    return this.client.listRooms();
+    return this.client.listRooms({ version: this.version });
   }
 
   async createRoom({ name, visibility, mode }) {

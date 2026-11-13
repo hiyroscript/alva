@@ -9,7 +9,8 @@
 // Suggest a name for a player on a controller who would rather not type.
 // Continue checks the name (js/online/rules.js) and asks the room server
 // whether it is there: if not ("Online play is unavailable right now"), back
-// to Home.
+// to Home. A page that cannot link to another player at all (no WebRTC, as
+// in the Linux desktop app) says so first, then Home.
 //
 // Online lobby (`online-lobby`): Create room (its dialog: the room's name,
 // "{name}'s room" to start with, Public or Private, the mode, Quick Battle
@@ -36,8 +37,9 @@
 // (the screen manager, menu navigation, the same header and panels), for
 // the keyboard, touch and controllers. Going offline anywhere here ends
 // Online Play: "Connection lost", then Home (App). So does Online play
-// closing (CLOSED: switched off by the owner, or the relay's monthly safety
-// stop reached), on any of these screens: its own message, then Home.
+// closing (CLOSED: switched off by the owner, the relay's monthly safety
+// stop reached, or this copy outdated by a newer release), on any of these
+// screens: its own message, then Home.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -50,7 +52,7 @@ import { CharacterSelectScreen } from './character-select-screen.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { checkName, checkRoomName, fitName, normalizeCode, isValidCode, NAME_LIMITS, ROOM_NAME_LIMITS } from '../online/rules.js';
 import { readStart } from '../online/match-setup.js';
-import { ONLINE_VERSION } from '../online/online-session.js';
+import { isNativeApp, openExternal, RELEASES_URL } from '../core/native-shell.js';
 
 // Online Play's setup, as the shared header names it (it has no steps:
 // rooms are not a sequence of choices).
@@ -65,6 +67,8 @@ const NOTICES = Object.freeze({
   full: ['online.full.title', 'online.full.message'],
   closed: ['online.closed.title', 'online.closed.message'],
   month_limit: ['online.closed.title', 'online.monthLimit.message'],
+  outdated: ['online.outdated.title', 'online.outdated.message'],
+  unsupported: ['online.unavailable.title', 'online.unsupported.message'],
   unavailable: ['online.unavailable.title', 'online.unavailable.message'],
   rate_limited: ['online.rateLimited.title', 'online.rateLimited.message'],
   room_not_found: ['online.notFound.title', 'online.notFound.message'],
@@ -88,8 +92,10 @@ export const noticeKeys = (code) => NOTICES[code] ?? NOTICES.error;
 
 // Tells the player about `code` in the app's dialog, one button to
 // acknowledge; resolves once they have. `detail` ([key, params]) adds a
-// line saying why, after the message.
+// line saying why, after the message. 'outdated' says how to update too
+// (showOutdated).
 export function showNotice(app, code, { detail = null } = {}) {
+  if (code === 'outdated') return showOutdated(app);
   const [title, message] = noticeKeys(code);
   const text = detail ? `${t(message)} ${t(...detail)}` : t(message);
   return app.dialog.open({ title: t(title), message: text, confirmLabel: t('online.notice.ok'), notice: true });
@@ -101,9 +107,29 @@ export function showNotice(app, code, { detail = null } = {}) {
 export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error', 'relay_unavailable']);
 
 // The codes that mean Online play is closed: switched off by the game's
-// owner ('closed'), or the relay's monthly safety stop reached
-// ('month_limit', until the next month). Online Play ends then, back Home.
-export const CLOSED = Object.freeze(['closed', 'month_limit']);
+// owner ('closed'), the relay's monthly safety stop reached ('month_limit',
+// until the next month), or, for this copy, a newer release out
+// ('outdated': the room server plays only with the current version, until
+// this copy is updated). Online Play ends then, back Home.
+export const CLOSED = Object.freeze(['closed', 'month_limit', 'outdated']);
+
+// A newer release is out ('outdated'): "A new version of Alva is out.
+// Update to play online.", and how. In a native app, Get the update opens
+// the Releases page, every installer of the newest release, in the
+// player's own browser (js/core/native-shell.js); in a browser, the page
+// reloaded serves the newest upload (itch.io's), or a downloaded copy is
+// downloaded again. Everything offline plays on whatever the version.
+// Resolves once the player has answered.
+export async function showOutdated(app, win = globalThis.window) {
+  const title = t('online.outdated.title');
+  const message = t('online.outdated.message');
+  if (!isNativeApp(win)) {
+    return app.dialog.open({ title, message: `${message} ${t('online.outdated.reload')}`, confirmLabel: t('online.notice.ok'), notice: true });
+  }
+  const update = await app.dialog.open({ title, message, confirmLabel: t('online.outdated.update'), cancelLabel: t('online.outdated.later') });
+  if (update) await openExternal(RELEASES_URL, win);
+  return update;
+}
 
 // Whether `code` ends Online Play (no server to use, or Online play
 // closed): back Home once the player has read why.
@@ -127,6 +153,7 @@ export async function showFailure(app, err) {
   const code = err?.code ?? 'unavailable';
   if (!UNAVAILABLE.includes(code)) return showNotice(app, code);
   const why = (await app.online?.diagnose?.().catch?.(() => null)) ?? null;
+  if (why?.code === 'outdated') return showOutdated(app);
   const reason = code === 'origin' ? 'origin' : code === 'server_error' && why?.code === 'reachable' ? 'server_error' : why?.code;
   const key = WHY_UNAVAILABLE[reason];
   // The page's address is not shown (on the game's GitHub Pages site, the
@@ -248,6 +275,13 @@ export class OnlineNameScreen extends Screen {
     this.field.input.value = checked.value;
     this.app.settings?.setOnlineName?.(checked.value);
     this.session.name = checked.value;
+    // A page that cannot link to another player (no WebRTC, as in the Linux
+    // desktop app): said before any room, then Home.
+    if (!this.session.linkSupported) {
+      await showNotice(this.app, 'unsupported');
+      if (this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
+      return;
+    }
     this.busy = true;
     this.continueButton.disabled = true;
     setText(this.status, 'online.connecting');
@@ -514,7 +548,7 @@ export class OnlineLobbyScreen extends Screen {
   // One public room: its name, host, mode and players, and Join (or why
   // not).
   row(room) {
-    const sameVersion = !room.version || room.version === ONLINE_VERSION;
+    const sameVersion = !room.version || room.version === this.session?.version;
     const joinable = !!room.joinable && sameVersion;
     const why = !sameVersion ? 'online.rooms.otherVersion' : room.status === 'playing' ? 'online.rooms.playing' : 'online.rooms.full';
     const name = el('span', { class: 'online-room-name' });

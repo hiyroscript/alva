@@ -26,6 +26,7 @@ import { cooldownIndicators } from '../../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../../js/ui/mobile-abilities.js';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
+import { notOurs } from '../helpers/repository.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -391,12 +392,9 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
 // Every file and folder of the repository but its git store, as paths.
 function repositoryPaths(dir = '') {
   return readdirSync(new URL(dir || './', ROOT), { withFileTypes: true }).flatMap((e) => {
-    // Not the repository's own: Git's store, npm's packages, the generated
-    // itch.io release (dist/, ignored by Git: copies of files read here) and
-    // the room server's local cache (server/.wrangler/, ignored by Git:
-    // what `npx wrangler dev` builds and stores).
-    if (e.name === '.git' || e.name === 'node_modules' || e.name === 'dist' || e.name === '.wrangler') return [];
+    // Not the repository's own (tests/helpers/repository.mjs).
     const path = `${dir}${e.name}`;
+    if (notOurs(path)) return [];
     return e.isDirectory() ? [`${path}/`, ...repositoryPaths(`${path}/`)] : [path];
   });
 }

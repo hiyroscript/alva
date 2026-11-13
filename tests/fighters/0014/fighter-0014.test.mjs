@@ -29,6 +29,7 @@ import { abilityGroups, abilityStatus, activeSpecialAbility, moveRestriction } f
 import { Projectile } from '../../../js/game/combat/projectile.js';
 import { mobileAbility, previewFrame } from '../../../js/ui/mobile-abilities.js';
 import { STRINGS, setLanguage } from '../../../js/localization/i18n.js';
+import { notOurs } from '../../helpers/repository.mjs';
 
 const DIR = 'assets/characters/0014/';
 const DEF = getCharacter('0014');
@@ -662,10 +663,9 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
 
 function repositoryPaths(dir = '') {
   return readdirSync(`${ROOT}${dir}` || './', { withFileTypes: true }).flatMap((e) => {
-    // Not the repository's own: Git's store, npm's packages, and the generated
-    // itch.io release (dist/, ignored by Git: copies of files read here).
-    if (e.name === '.git' || e.name === 'node_modules' || e.name === 'dist' || e.name === '.wrangler') return [];
+    // Not the repository's own (tests/helpers/repository.mjs).
     const path = `${dir}${e.name}`;
+    if (notOurs(path)) return [];
     return e.isDirectory() ? [`${path}/`, ...repositoryPaths(`${path}/`)] : [path];
   });
 }

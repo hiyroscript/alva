@@ -9,6 +9,11 @@
 // There is no other way: with no relay's servers to be had, or the link
 // not open within CONFIG.online.connectTimeoutMs, start() rejects and the
 // player is told "Couldn't connect to your opponent" (and may try again).
+//
+// A page with no WebRTC at all can make no link (`matchLink.supported`):
+// every browser has it, but not every webview, Linux's WebKitGTK as most
+// distributions build it among them (the Linux desktop app's,
+// docs/development/native-apps.md). Online Play says so before the lobby.
 
 import { webRtcPeer } from './peer.js';
 
@@ -44,3 +49,6 @@ export function matchLink({ initiator, sendSignal, requestRelay, timeoutMs, make
     },
   };
 }
+
+// Whether this page can make a link at all: a WebRTC peer connection.
+matchLink.supported = (win = globalThis) => typeof win?.RTCPeerConnection === 'function';

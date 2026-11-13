@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import gateway from '../gateway/public/_worker.js';
 import worker from '../src/index.js';
 import { RoomServerClient } from '../../js/online/server-client.js';
-import { makeEnv, gameRequest, createBody, joinBody } from './fakes.mjs';
+import { makeEnv, gameRequest, createBody, joinBody, VERSION } from './fakes.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const setting = (toml, key) => toml.match(new RegExp(`^${key} = "([^"]+)"`, 'm'))?.[1];
@@ -74,16 +74,19 @@ test('a gateway that cannot reach the Worker answers server_error (ok: false), r
 
 test('the game reads a broken gateway as "rooms not working", and a working one as the server', async () => {
   const broken = new RoomServerClient({ baseUrl: 'https://alva-online.pages.dev', fetchImpl: (url, init) => gateway.fetch(new Request(url, init), {}) });
-  await assert.rejects(broken.listRooms(), { code: 'server_error' });
-  assert.equal((await broken.diagnose()).code, 'server_error');
+  await assert.rejects(broken.listRooms({ version: VERSION }), { code: 'server_error' });
+  assert.equal((await broken.diagnose({ version: VERSION })).code, 'server_error');
   const { through } = wired();
   const origin = 'https://html-classic.itch.zone';
   const working = new RoomServerClient({
     baseUrl: 'https://alva-online.pages.dev',
     fetchImpl: (url, init) => through(new Request(url, { ...init, headers: { ...init?.headers, origin, 'cf-connecting-ip': '203.0.113.7' } })),
   });
-  assert.deepEqual(await working.listRooms(), []);
-  assert.equal((await working.diagnose()).code, 'reachable');
+  assert.deepEqual(await working.listRooms({ version: VERSION }), []);
+  assert.equal((await working.diagnose({ version: VERSION })).code, 'reachable');
+  // Through the gateway too, another version is outdated.
+  await assert.rejects(working.listRooms({ version: '0.9.0' }), { code: 'outdated' });
+  assert.equal((await working.diagnose({ version: '0.9.0' })).code, 'outdated');
   assert.equal(working.roomSocketUrl('abc', 't'), 'wss://alva-online.pages.dev/rooms/abc/ws?token=t');
 });
 

@@ -241,6 +241,9 @@
 .home-utility-buttons .icon { font-size: clamp(20px, 3.4vh, 24px); }
 .home-controller img { width: clamp(24px, 4vh, 28px); height: clamp(24px, 4vh, 28px); object-fit: contain; }
 .home-utility-buttons > button:disabled, .home-download:disabled { cursor: default; }
+/* No Download in a native app: Alva is installed already
+   (js/core/native-shell.js). */
+.home-download[hidden] { display: none; }
 .home-settings .icon { transition: transform var(--dur) var(--ease); }
 :where(html:not(.is-touch-input)) .home-settings:hover, .home-settings.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
 :where(html:not(.is-touch-input)) .home-settings:hover .icon, .home-settings.is-cursor-target .icon, :where(html:not(.is-pointer-input)) .home-settings:focus .icon { transform: rotate(30deg); }

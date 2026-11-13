@@ -26,7 +26,10 @@
 // stop is reached) the room closes, telling both players why; with this
 // hour's passwords all handed out, the player is told 'full'. A room also
 // closes as 'closed' when a player connects while Online play is switched
-// off.
+// off, and as 'outdated' when a player connects or asks for the relay once
+// a release has replaced its version (CURRENT_VERSION, server/src/rules.js
+// roomVersionCurrent): a deploy drops every room's sockets, so its players
+// are told at their reconnect that a new version is out.
 //
 // Its sockets use the WebSocket Hibernation API (ctx.acceptWebSocket), so a
 // room where nobody is sending anything costs no Durable Object duration;
@@ -61,10 +64,10 @@
 //   { type: 'rematch' }                       both want a rematch: the host starts it
 //   { type: 'signal', data }                  the other player's signalling, with no address but the relay's
 //   { type: 'relay', iceServers }             the relay's servers, or { type: 'relay', error }
-//   { type: 'closed', reason }                the room is gone ('host_left', 'expired', 'closed', 'month_limit')
+//   { type: 'closed', reason }                the room is gone ('host_left', 'expired', 'closed', 'month_limit', 'outdated')
 //   { type: 'error', code }
 
-import { validFighterId, validDelay } from './rules.js';
+import { validFighterId, validDelay, roomVersionCurrent } from './rules.js';
 import { scrubSignal, relayServers } from './privacy.js';
 import { json, error, readJson, numberVar, onlineOpen } from './http.js';
 
@@ -199,8 +202,15 @@ export class Room {
     await this.save();
     this.broadcast();
     await this.report();
-    // Online play switched off: the room ends, and its players are told.
+    // Online play switched off, or this room's version replaced by a
+    // release: the room ends, and its players are told.
     if (!onlineOpen(this.env)) await this.close('closed');
+    else if (!this.versionCurrent) await this.close('outdated');
+  }
+
+  // Whether this room's version (its host's) still plays.
+  get versionCurrent() {
+    return roomVersionCurrent(this.state?.seats?.host?.version, this.env);
   }
 
   // ---- Messages ---------------------------------------------------------------------
@@ -320,6 +330,7 @@ export class Room {
     const s = this.state;
     const me = s.seats[name];
     if (!s.seats[otherName]) return this.send(ws, { type: 'relay', error: 'bad_request' });
+    if (!this.versionCurrent) return this.close('outdated');
     const t = this.now();
     me.relayAt = (me.relayAt ?? []).filter((at) => t - at < RELAY_WINDOW_MS);
     if (me.relayAt.length >= RELAY_PER_WINDOW) return this.send(ws, { type: 'relay', error: 'rate_limited' });

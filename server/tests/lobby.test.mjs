@@ -50,13 +50,17 @@ test('every field is checked on the server: names, the room name, mode, visibili
     [{ mode: 'battle-royale' }, 'invalid_mode'],
     [{ visibility: 'hidden' }, 'invalid_visibility'],
     [{ session: 'not hex!' }, 'bad_request'],
-    [{ version: undefined }, 'bad_request'],
   ];
   for (const [over, code] of cases) {
     const res = await post(env, '/rooms', createBody(over));
     assert.equal((await body(res)).error, code, JSON.stringify(over));
     assert.equal(res.status, 400);
   }
+  // A game that names no version is an older copy: outdated (the version
+  // rule's own tests are in worker.test.mjs).
+  const unversioned = await post(env, '/rooms', createBody({ version: undefined }));
+  assert.equal(unversioned.status, 409);
+  assert.equal((await body(unversioned)).error, 'outdated');
   // Names are cleaned the same way the game cleans them.
   const ok = await body(await post(env, '/rooms', createBody({ playerName: '  Zoë   d’Arc ', name: 'Zoë’s  room' })));
   assert.equal(ok.room.host, "Zoë d'Arc");
@@ -136,10 +140,12 @@ test('joining: by code in any case, by id for public rooms only; unknown, full a
   assert.equal((await body(await post(env, '/rooms/join', joinBody({ code: 'AB0' })))).error, 'invalid_code');
   assert.equal((await body(await post(env, '/rooms/join', joinBody({ code: 'ZZZZZ' })))).error, 'room_not_found');
   assert.equal((await body(await post(env, '/rooms/join', joinBody({ id: 'f'.repeat(20) })))).error, 'room_not_found');
-  // A different version of the game never shares a match.
-  const other = await post(env, '/rooms/join', joinBody({ id: pub.room.id, version: '9.9.9' }));
+  // A different version of the game never shares a match: a room made
+  // before a release, joined by a game of the new one.
+  env.CURRENT_VERSION = '1.0.1';
+  const other = await post(env, '/rooms/join', joinBody({ id: pub.room.id, version: '1.0.1' }));
   assert.equal((await body(other)).error, 'version_mismatch');
-  assert.equal(VERSION, '0.1.0');
+  env.CURRENT_VERSION = VERSION;
   // A bad name.
   assert.equal((await body(await post(env, '/rooms/join', joinBody({ id: pub.room.id, playerName: '' })))).error, 'invalid_name');
   // The same visit joining again (a reload) keeps its seat.

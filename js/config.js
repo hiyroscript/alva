@@ -5,7 +5,13 @@
 export const CONFIG = Object.freeze({
   title: 'ALVA',     // wordmark / document title
   name: 'Alva',      // product name in running text
-  version: '0.1.0',
+  // The release's version: package.json's, written into the bundle when the
+  // release is built (tools/itch/release.mjs releaseDefine), so the itch.io
+  // ZIP and every native app built from it carry it. The modules run as
+  // they are, from the repository, are 'dev'. Online Play plays only with
+  // the room server's current version, and 'dev' only from a computer's
+  // own address (docs/gameplay/online-play.md).
+  version: typeof globalThis.ALVA_RELEASE_VERSION === 'string' ? globalThis.ALVA_RELEASE_VERSION : 'dev',
   developer: 'hiyroscript',
 
   render: {

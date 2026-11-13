@@ -6,7 +6,8 @@
 // length), that nothing development-only was packaged (tests, docs, tools,
 // source maps, Git, npm), that the release is current (its page, joined
 // stylesheet and assets exactly what the repository's would make now, its
-// bundle every module in ES evaluation order), that everything the game
+// bundle every module in ES evaluation order, with package.json's version
+// written in), that everything the game
 // loads is in it under its exact, case-sensitive name (every fighter's
 // frames, in the pack byte for byte, the icons, the images the code
 // names), that nothing loads from
@@ -19,9 +20,9 @@ import { pathToFileURL } from 'node:url';
 import { transform } from 'esbuild';
 import {
   ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS, DEVELOPMENT_ONLY,
-  read, pageParts, joinStylesheets, releasePage, moduleOrder, isPacked, readPack,
+  read, pageParts, joinStylesheets, releasePage, moduleOrder, isPacked, readPack, releaseVersion, RELEASE_GLOBAL,
 } from './release.mjs';
-import { EXTERNAL_URL, hostProblems } from './hosts.mjs';
+import { hostProblems, openedLinks } from './hosts.mjs';
 import { readZip } from './zip.mjs';
 
 // Every file under `dir`, as relative paths with their names' real case.
@@ -140,6 +141,11 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
       `${bundled[at] ?? 'nothing'} where ${expected[at] ?? 'nothing'} runs)`);
   }
   if (/sourceMappingURL/.test(js)) fail(`${BUNDLE_JS} points to a source map`);
+  // The release's version written in (releaseDefine): no copy that would
+  // play online as 'dev', or as another version than package.json's.
+  const version = releaseVersion();
+  if (js.includes(RELEASE_GLOBAL)) fail(`${BUNDLE_JS} still reads ${RELEASE_GLOBAL}: its version was not written in`);
+  else if (!js.includes(JSON.stringify(version))) fail(`${BUNDLE_JS} does not carry package.json's version, ${version}: rebuild the release`);
   const code = (await transform(js, { minifyWhitespace: true, format: 'esm', charset: 'utf8', legalComments: 'none' })).code;
   const named = new Set([...code.matchAll(ASSET_PATH)].map((m) => m[2]));
   for (const path of named) {
@@ -160,10 +166,10 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
   const manifest = JSON.parse(bytes.get('manifest.webmanifest')?.toString('utf8') ?? '{}');
   for (const icon of manifest.icons ?? []) if (!has(icon.src)) fail(`manifest icon ${icon.src} is not in the release`);
 
-  // No other host: the only addresses in the release are the credits' links
-  // to the sprite sources (opened by the player, never loaded) and the room
-  // server Online Play is set up with, if any (hosts.mjs).
-  const approved = new Set(read('js/ui/credits.js').match(EXTERNAL_URL) ?? []);
+  // No other host: the only addresses in the release are the links the
+  // player opens (the credits' and the Releases page, never loaded) and the
+  // room server Online Play is set up with, if any (hosts.mjs).
+  const approved = openedLinks(read('js/ui/credits.js'));
   const { CONFIG } = await import(pathToFileURL(`${ROOT}js/config.js`).href);
   for (const f of files.filter((p) => /\.(html|css|js|webmanifest)$/.test(p))) {
     for (const problem of hostProblems(bytes.get(f).toString('utf8'), f, { approved, serverUrl: CONFIG.online.serverUrl })) fail(problem);

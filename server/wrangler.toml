@@ -57,11 +57,25 @@ new_sqlite_classes = ["Lobby", "Room"]
 [vars]
 # Who may call the server: the itch.io pages that run the game (itch.io serves
 # HTML5 games from html-classic.itch.zone and html.itch.zone, and may use
-# other *.itch.zone hosts) and a copy on your own computer for testing.
+# other *.itch.zone hosts), the native apps (docs/development/native-apps.md:
+# the desktop apps' page is tauri://localhost on macOS and Linux and
+# http://tauri.localhost on Windows, https://tauri.localhost should an app
+# ever be built on the https scheme; the Android app's is https://alva.app,
+# a fixed address of its own that never leaves the phone) and a copy on your
+# own computer for testing.
 # Comma-separated; * stands for any host labels before the domain, or any
-# port. Change it here and deploy again (merging into main does it when
-# Cloudflare deploys from GitHub); no code changes.
-ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*"
+# port. Change it here and deploy again; no code changes.
+ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,tauri://localhost,http://tauri.localhost,https://tauri.localhost,https://alva.app,http://localhost:*,http://127.0.0.1:*"
+
+# The version rule (server/src/rules.js versionAllowed): Online play is for
+# this release only. A game of any other version, wherever it runs, is
+# refused as `outdated` ("A new version of Alva is out. Update to play
+# online."), and an open room of an older one closes the same way. It is
+# package.json's version, kept equal to it (a test checks): each release
+# sets both, and deploys the server last, once the new version can be
+# downloaded. The game's modules run from the repository ('dev') play only
+# from http://localhost or http://127.0.0.1.
+CURRENT_VERSION = "1.0.0"
 
 # Staying inside Cloudflare's free Workers plan (checked on 2026-11-03:
 # https://developers.cloudflare.com/durable-objects/platform/pricing/). Its

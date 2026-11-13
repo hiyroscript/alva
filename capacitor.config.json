@@ -1,0 +1,14 @@
+{
+  "appId": "io.github.hiyroscript.alva",
+  "appName": "Alva",
+  "webDir": "dist/itch",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "alva.app"
+  },
+  "android": {
+    "backgroundColor": "#050506",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

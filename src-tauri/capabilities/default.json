@@ -1,0 +1,74 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "All the game's page may ask of the desktop app (docs/development/native-apps.md): its window in and out of fullscreen (F11), and the game's own links opened in the player's browser: the Releases page (the update button) and the credits' links, exactly these, nothing else.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-fullscreen",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/hiyroscript/alva/releases/latest"
+        },
+        {
+          "url": "https://share.google/uwRM2BMytKaaK3Ycf"
+        },
+        {
+          "url": "https://www.deviantart.com/degue-1297/art/443591282"
+        },
+        {
+          "url": "https://www.deviantart.com/finhj/art/1084627848"
+        },
+        {
+          "url": "https://www.deviantart.com/gameinvader247/art/636302762"
+        },
+        {
+          "url": "https://www.deviantart.com/imhomiejaydev/art/853407339"
+        },
+        {
+          "url": "https://www.deviantart.com/prodijiu/art/826586119"
+        },
+        {
+          "url": "https://www.deviantart.com/thespriteanimations/art/Sprite-Sheet-1350194762"
+        },
+        {
+          "url": "https://www.deviantart.com/xelectromanx10/art/1138904217"
+        },
+        {
+          "url": "https://www.deviantart.com/xmaygrrr/art/748406504"
+        },
+        {
+          "url": "https://www.deviantart.com/xmaygrrr/art/758846183"
+        },
+        {
+          "url": "https://www.deviantart.com/xxalexsmashxx/art/1262852046"
+        },
+        {
+          "url": "https://www.deviantart.com/xxalexsmashxx/art/1262864119"
+        },
+        {
+          "url": "https://www.deviantart.com/xxalexsmashxx/art/1262877085"
+        },
+        {
+          "url": "https://www.deviantart.com/xxalexsmashxx/art/955488395"
+        },
+        {
+          "url": "https://www.deviantart.com/xxalexsmashxx/art/955490753"
+        },
+        {
+          "url": "https://www.spriters-resource.com/ds_dsi/jus/asset/2032/"
+        },
+        {
+          "url": "https://www.spriters-resource.com/ds_dsi/jus/asset/20891/"
+        },
+        {
+          "url": "https://www.spriters-resource.com/game_boy_advance/sonicbattle/asset/10042/"
+        }
+      ]
+    }
+  ]
+}

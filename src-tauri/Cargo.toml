@@ -1,0 +1,35 @@
+# Alva's desktop app (docs/development/native-apps.md): a Tauri window
+# around the itch.io release (dist/itch), nothing of the game forked.
+# The app's version is package.json's (tauri.conf.json reads it from
+# there); the crate's own below is never shown and never changes.
+[package]
+name = "alva"
+version = "0.0.0"
+description = "Alva, the desktop app"
+authors = ["hiyroscript"]
+edition = "2021"
+publish = false
+
+[lib]
+name = "alva_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+tauri-plugin-opener = "2.7.3"
+
+# Linux's webview (WebKitGTK), the one tauri itself uses, for its WebRTC
+# switch (lib.rs).
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "2.0", features = ["v2_38"] }
+
+# Smaller, faster release binaries.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

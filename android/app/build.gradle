@@ -1,0 +1,82 @@
+// Alva's Android app (docs/development/native-apps.md): a Capacitor
+// WebView around the itch.io release (dist/itch, copied in by
+// `npx cap sync android`), nothing of the game forked.
+
+apply plugin: 'com.android.application'
+
+// The version is package.json's, the one place it is written: versionName
+// is it as it is, versionCode MAJOR × 10000 + MINOR × 100 + PATCH (1.0.0
+// is 10000, 1.2.3 is 10203; tools/itch/release.mjs versionCode makes the
+// same), so every release has a higher code than the one before, which
+// Android needs to install it over the app.
+def appVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version
+def versionMatch = appVersion =~ /^(0|[1-9]\d*)\.([1-9]?\d)\.([1-9]?\d)$/
+if (!versionMatch.matches()) {
+    throw new GradleException("package.json's version should be MAJOR.MINOR.PATCH (MINOR and PATCH under 100), not " + appVersion)
+}
+def appVersionCode = versionMatch.group(1).toInteger() * 10000 + versionMatch.group(2).toInteger() * 100 + versionMatch.group(3).toInteger()
+
+// Release signing, from the environment (or the same names as Gradle
+// properties): the keystore's path, its password, the key's alias and the
+// key's password. None of them is ever committed. With all four, the
+// release build is signed with that key; without them it is left
+// unsigned (and the debug build keeps Android's own debug key), so a
+// build never fails for want of a key.
+def signingValue = { String name -> System.getenv(name) ?: (project.hasProperty(name) ? project.property(name) : null) }
+def releaseKeystore = signingValue('ANDROID_KEYSTORE_PATH')
+def releaseSigning = releaseKeystore && signingValue('ANDROID_KEYSTORE_PASSWORD') && signingValue('ANDROID_KEY_ALIAS') && signingValue('ANDROID_KEY_PASSWORD')
+
+android {
+    namespace = "io.github.hiyroscript.alva"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "io.github.hiyroscript.alva"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (releaseSigning) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword signingValue('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias signingValue('ANDROID_KEY_ALIAS')
+                keyPassword signingValue('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigning) signingConfig signingConfigs.release
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
