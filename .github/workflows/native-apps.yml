@@ -1,0 +1,270 @@
+# The native apps, built and checked on every pull request
+# (docs/development/native-apps.md): Windows, macOS and Linux from Tauri
+# (src-tauri/), Android from Capacitor (android/), each wrapping the
+# itch.io release. Every job first runs the tests (the room server's in
+# server/ included) and plays the release against the source
+# (npm run verify:itch), then builds its installers and keeps them on the
+# run's page (Actions › the run › Artifacts, 90 days), each named for what
+# it is: Alva-1.0.0-windows-x64-setup.exe, Alva-1.0.0-android.apk and so
+# on. It never publishes anything. "Run workflow" (Actions tab) runs it on
+# any branch.
+#
+# Android is signed with the release key only when the repository has its
+# four secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD); without them it still builds,
+# an installable debug APK and an unsigned AAB. The desktop apps are not
+# signed (free: no certificate): Windows SmartScreen and macOS Gatekeeper
+# warn before the first launch.
+
+name: Native apps
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request replaces a run still going.
+concurrency:
+  group: native-apps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            platform: windows
+            bundles: nsis,msi
+            target: ''
+            rust-targets: ''
+          - name: macOS
+            os: macos-latest
+            platform: macos
+            bundles: dmg
+            # One app for both Apple silicon and Intel Macs.
+            target: universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Linux
+            os: ubuntu-22.04
+            platform: linux
+            bundles: appimage,deb
+            target: ''
+            rust-targets: ''
+    steps:
+      # The files as they are in the repository, never with Windows line
+      # endings (the tests and the release compare them byte for byte).
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Linux libraries for the webview (WebKitGTK)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev build-essential file
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target || 'native' }}
+
+      - name: Install the tools (esbuild, Tauri, Capacitor)
+        run: npm ci
+
+      - name: Run the tests
+        run: node --test
+
+      - name: Play the bundle against the source
+        run: npm run verify:itch
+
+      - name: Build the installers
+        shell: bash
+        run: npx tauri build --bundles ${{ matrix.bundles }} ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+
+      - name: Name the installers
+        id: installers
+        shell: bash
+        run: |
+          node tools/native/collect.mjs ${{ matrix.platform }}
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # One artifact per installer, named after it.
+      - name: Keep the Windows installer (.exe)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-windows-x64-setup.exe
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-windows-x64-setup.exe
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the Windows installer (.msi)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-windows-x64.msi
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-windows-x64.msi
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the Mac disk image (.dmg)
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-macos-universal.dmg
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-macos-universal.dmg
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the Linux AppImage
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-linux-x86_64.AppImage
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-linux-x86_64.AppImage
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the Linux package (.deb)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-linux-amd64.deb
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-linux-amd64.deb
+          if-no-files-found: error
+          compression-level: 0
+      # The itch.io release the apps wrap, for trying the browser version
+      # beside them (the same ZIP the itch.io workflow keeps on main).
+      - name: Keep the itch.io ZIP
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-itch-html
+          path: dist/alva-itch.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Empty without the secrets (and on pull requests from forks): the
+      # build is then unsigned, never failed.
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install the tools (esbuild, Tauri, Capacitor)
+        run: npm ci
+
+      - name: Run the tests
+        run: node --test
+
+      - name: Play the bundle against the source
+        run: npm run verify:itch
+
+      # The key exists only in this job's temporary folder, never in the
+      # workspace or a log; Gradle reads its path and passwords from the
+      # environment (android/app/build.gradle).
+      - name: The release key (only with the secrets)
+        if: env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != ''
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/alva-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/alva-release.jks" >> "$GITHUB_ENV"
+
+      - name: Copy the release into the app
+        run: npm run cap:sync
+
+      - name: Build the APKs and the AAB
+        working-directory: android
+        run: ./gradlew assembleDebug assembleRelease bundleRelease --no-daemon
+
+      - name: Check the permissions and the signature
+        run: |
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          for apk in android/app/build/outputs/apk/*/*.apk; do
+            echo "$apk"
+            "$tools/aapt2" dump permissions "$apk"
+            others="$("$tools/aapt2" dump permissions "$apk" | grep '^uses-permission' | grep -v "name='android.permission.INTERNET'" || true)"
+            if [ -n "$others" ]; then echo "::error::$apk asks for more than INTERNET: $others"; exit 1; fi
+          done
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            "$tools/apksigner" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | grep -v -i "SHA-1"
+          else
+            echo "No release key: the release APK is unsigned; the debug APK is the one to install."
+          fi
+
+      - name: Name the installers
+        id: installers
+        run: |
+          node tools/native/collect.mjs android
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          ls dist/installers
+
+      - name: Keep the APK (signed)
+        if: hashFiles('dist/installers/*-android.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-android.apk
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-android.apk
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the AAB (signed)
+        if: hashFiles('dist/installers/*-android.aab') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-android.aab
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-android.aab
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the APK (debug key, no release key yet)
+        if: hashFiles('dist/installers/*-android-debug.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-android-debug.apk
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-android-debug.apk
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep the AAB (unsigned, no release key yet)
+        if: hashFiles('dist/installers/*-android-unsigned.aab') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alva-${{ steps.installers.outputs.version }}-android-unsigned.aab
+          path: dist/installers/Alva-${{ steps.installers.outputs.version }}-android-unsigned.aab
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Forget the release key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/alva-release.jks"
