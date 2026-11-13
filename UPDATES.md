@@ -7571,3 +7571,89 @@ floor, the grenade lobbed from her hop and its flash holding #0007 and
 Katana, the dive and the flying knee); her portrait and her ability HUD.
 The itch.io release builds (14 files) and plays all 60 equivalence
 scenarios exactly as the source.
+
+## Native apps
+
+Not a named update (it can become one if the owner names it). Asked for
+(the `max` brief, its first part): Alva as real installable apps for
+Windows, macOS, Linux and Android, shared from itch.io, MediaFire and
+GitHub's Releases page rather than a store; every app the very itch.io
+release, nothing forked; saves kept between launches; online play working
+in every app, and only between players on the current release; releases
+automatic later (the brief's second part, still to come); everything free.
+Pull request [#195](https://github.com/hiyroscript/alva/pull/195).
+[The native apps](./docs/development/native-apps.md) explains all of it.
+
+- **The desktop apps** (`src-tauri/`, Tauri 2.12): the identifier
+  `io.github.hiyroscript.alva`, one window (1280 × 720, at least 640 × 360,
+  resizable, F11 for fullscreen), no menu bar on Windows and Linux, the
+  release (`dist/itch`) as its page, built first by
+  `npm run build:itch`. A CSP that allows only the room server's https and
+  wss besides the page's own files, and a capability allowing only the
+  window's fullscreen and the opener for exactly the Releases page and the
+  credits' links. Installers: NSIS `.exe` and `.msi`, a universal `.dmg`
+  (ad-hoc signed), `.AppImage` and `.deb`. Saves in the webview's folder
+  named after the identifier (checked on Linux: a choice made at one launch
+  is there at the next).
+- **The Android app** (`capacitor.config.json`, `android/`, Capacitor 8.6):
+  the same identifier, the fixed origin `https://alva.app`, landscape (a
+  game, so on large screens too), full screen, Back as the game's own Back,
+  `INTERNET` its only permission, minSdk 24 and targetSdk 36, the release
+  key read from the environment only (unsigned, never failing, without it).
+- **In the game** (`js/core/native-shell.js`, the one place it asks where
+  it runs): in an app, no Download on Home or on the small-screen block
+  (installed already), the installed app's screen minimum and landscape
+  lock, links to other sites opened in the player's browser (the opener,
+  or Android's `ACTION_VIEW` through Capacitor's AppLauncher), F11 on a
+  computer. A browser behaves exactly as before.
+- **One version**, package.json's, from 1.0.0 (the repository's `0.1.0` in
+  `CONFIG.version` had never been shown or raised): written into the bundle
+  by esbuild's `define` (`releaseDefine`; the release's validation fails a
+  bundle without it; the modules as they are play as `dev`), read by
+  Tauri, and made into the Android versionName and versionCode (MAJOR ×
+  10000 + MINOR × 100 + PATCH). The room server's `CURRENT_VERSION` equals
+  it.
+- **Online play on the current version only.** The game sends its version
+  with the reachability check, the list, creating and joining; the server
+  refuses any other as `outdated` (409), `dev` only from
+  `http://localhost` and `http://127.0.0.1`, and a room left from an older
+  release closes as `outdated`. The player reads "A new version of Alva is
+  out. Update to play online.", with Get the update (the Releases page) in
+  an app, or how to reload in a browser; everything offline plays on. The
+  `+turn` mark on the online version is gone: older copies are refused
+  outright.
+- **The apps' origins** on the server's list: `tauri://localhost`,
+  `http://tauri.localhost`, `https://tauri.localhost`, `https://alva.app`.
+- **Linux and WebRTC.** WebKitGTK keeps WebRTC off, and the app turns it
+  on, but Ubuntu's and Debian's builds have none at all (2.52.6, checked):
+  the Linux app says "Online play needs a connection this copy of Alva
+  can't make. Play online in a web browser instead." before any room.
+- **Building:** `npm run app:dev`, `build:desktop`, `cap:sync`,
+  `build:android`, `build:android:release`, `app:icons` (every icon from
+  `assets/icons/` with `tauri icon` and `capacitor-assets`), and
+  `.github/workflows/native-apps.yml` on every pull request: the tests and
+  `verify:itch` in each job, then every installer kept as an artifact named
+  for what it is (`Alva-1.0.0-windows-x64-setup.exe` …), Android signed
+  only with its four secrets.
+
+**Code:** `src-tauri/` (new), `capacitor.config.json` and `android/`
+(new), `js/core/native-shell.js` (new), `js/core/web-app-install.js`,
+`js/core/screen-guard.js`, `js/main.js`, `js/screens/home-screen.js`,
+`js/screens/online-screens.js`, `js/online/` (`online-session.js`,
+`server-client.js`, `match-link.js`), `js/config.js`, the English and
+French strings, `css/home.css`, `css/overlays.css`; the room server
+(`server/src/index.js`, `rules.js`, `room.js`, `http.js`,
+`server/wrangler.toml`); `tools/itch/` (`release.mjs`: the version,
+`releaseDefine`, the shells development-only; `validate.mjs`; `hosts.mjs`:
+the links the player opens) and `tools/native/` (new); `package.json`
+(1.0.0, the Tauri and Capacitor packages pinned) and `.gitignore`.
+
+**Tests:** new `tests/interface/native-apps.test.mjs`; the version rule in
+`tests/online/online-play.test.mjs` and in the server's `worker`,
+`safeguards`, `lobby` and `gateway` tests (the server's fakes now at
+`CURRENT_VERSION` 1.0.0, the game's at the same release); the repository
+walks (`codenames` and fifteen fighter files) share one list of what is
+not the repository's own (`tests/helpers/repository.mjs`: the native
+builds, and the lockfiles, one of whose random hashes matched a name
+pattern by chance). The itch.io release still builds (14 files) and plays
+all 60 equivalence scenarios exactly as the source.

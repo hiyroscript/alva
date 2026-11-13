@@ -183,7 +183,14 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - uses: android-actions/setup-android@v3
+      # The runner has the Android SDK (ANDROID_HOME): its licenses
+      # accepted and the platform the app compiles against, so Gradle
+      # fetches nothing else of it.
+      - name: The Android SDK's platform
+        run: |
+          sdkmanager="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
+          yes | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" "platforms;android-36" "platform-tools" > /dev/null
 
       - name: Install the tools (esbuild, Tauri, Capacitor)
         run: npm ci

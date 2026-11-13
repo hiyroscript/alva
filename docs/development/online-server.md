@@ -30,8 +30,8 @@ steps are [below](#putting-it-online-step-by-step)).
 
 | Request | Answer |
 | --- | --- |
-| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "relay": …, "open": …, "closed": …, "origin": …, "originAllowed": … }`: the server is up, its Lobby answers, whether the relay's key is set up, and whether Online play is open (`closed`: `"closed"` when switched off, `"month_limit"` once the month's safety stop is reached, else `null`) (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
-| `GET /rooms` | The public rooms: `{ rooms: [{ id, name, host, mode, players, status, version, joinable }] }`. |
+| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "relay": …, "open": …, "closed": …, "origin": …, "originAllowed": …, "currentVersion": …, "versionAllowed": … }`: the server is up, its Lobby answers, whether the relay's key is set up, whether Online play is open (`closed`: `"closed"` when switched off, `"month_limit"` once the month's safety stop is reached, else `null`), the version it plays with, and whether the asking game's (`?version=`) plays (`null` when it names none) (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
+| `GET /rooms?version=…` | The public rooms: `{ rooms: [{ id, name, host, mode, players, status, version, joinable }] }`, for a game of that version. |
 | `POST /rooms` | Create: `{ name, playerName, visibility, mode, session, version }` → `{ room, seat: 'host', token }`, or `{ error: 'full' }` (503). |
 | `POST /rooms/join` | Join by `{ code }` (any room) or `{ id }` (a public room), with `{ playerName, session, version }` → `{ room, seat: 'guest', token }`. |
 | `GET /rooms/:id/ws?token=…` | The room's WebSocket, for the seat whose token it brings. |
@@ -39,7 +39,9 @@ steps are [below](#putting-it-online-step-by-step)).
 Every field is checked on the server; a refusal is a code the game
 translates: `invalid_name`, `invalid_room_name`, `invalid_mode`,
 `invalid_visibility`, `invalid_code`, `room_not_found`, `room_full`,
-`version_mismatch` (two versions of the game never share a match), `full`,
+`version_mismatch` (two versions of the game never share a match),
+`outdated` (the game is not the current version: [the version
+rule](#the-version-rule)), `full`,
 `rate_limited`, `origin`, `bad_request`, `relay_unavailable` (no relay
 key), `closed` (Online play switched off), `month_limit` (the relay's
 monthly safety stop), `server_error` (something failed: logged, see
@@ -51,7 +53,11 @@ the top of [`server/src/room.js`](../../server/src/room.js).
 **Who may call it.** Every request but `/health` must come from one of
 `ALLOWED_ORIGINS` in `wrangler.toml`: itch.io's HTML5 game hosts
 (`https://html-classic.itch.zone`, `https://html.itch.zone`, and any other
-`https://*.itch.zone`, the domain itch.io serves games from) and
+`https://*.itch.zone`, the domain itch.io serves games from), the [native
+apps](native-apps.md#origins) (`tauri://localhost` for the desktop apps on
+macOS and Linux, `http://tauri.localhost` and `https://tauri.localhost` on
+Windows, `https://alva.app` for the Android app; `parseOrigins` reads the
+`tauri:` scheme like any other, each an exact origin) and
 `http://localhost:*` / `http://127.0.0.1:*` for testing. The game's own
 site on GitHub Pages is not on it, so Online Play is for the itch.io page
 (adding `https://hiyroscript.github.io` to the list would open it there
@@ -86,8 +92,9 @@ server keeps none:
   server-reflexive and peer-reflexive candidates dropped; the SDP's `c=`,
   `a=rtcp` and `o=` addresses blanked; unknown kinds dropped. The game
   scrubs what it sends the same way (`js/online/privacy.js`); a test holds
-  the two copies to the same answers. The game's online version (`+turn`)
-  keeps older copies out of its rooms.
+  the two copies to the same answers. Only the current version plays at
+  all ([the version rule](#the-version-rule)), so no older copy is a way
+  around any of this.
 - **What a player sees of the other:** the name they typed, their fighter,
   Ready, Rematch and whether they are connected, and (over the relay) their
   match packets: input frames, acknowledgements, hashes. Never a token, a
@@ -107,6 +114,31 @@ server keeps none:
   stops working within the hour, the server hands out at most
   `RELAY_PASSWORDS_PER_HOUR` an hour in all, and only to players in a room
   with both seats taken ([the relay's safeguards](#the-relays-safeguards)).
+
+### The version rule
+
+Online play is for the current release only (`versionAllowed` in
+[`server/src/rules.js`](../../server/src/rules.js)). `CURRENT_VERSION` in
+`wrangler.toml` is that release's version, package.json's (a test holds the
+two equal; each release sets both). The Worker refuses the list (its
+`?version=`), creating and joining (the body's `version`) as `outdated` for
+a game of any other version, or none, before any Durable Object wakes, and
+`/health?version=` says it too (`versionAllowed`). A game run from the
+repository's modules plays as `dev`, let in only from `http://localhost`
+and `http://127.0.0.1` (any port), so testing on one's own computer still
+plays while no real site can claim it. A room keeps its host's version: a
+game of another never joins it (`version_mismatch`), and a room left from
+an older release closes as `outdated` (`roomVersionCurrent` in
+[`server/src/room.js`](../../server/src/room.js)) when a player connects or
+asks for the relay, which a deploy brings about at once (it drops every
+room's sockets, and the game reconnects). With no `CURRENT_VERSION` at all
+only `dev` plays. The game tells the player a new version is out and how to
+get it ([online play](../gameplay/online-play.md#the-version-rule)).
+
+So a new `CURRENT_VERSION` locks every older copy out of Online play the
+moment it is deployed: deploy it only once the new version can be
+downloaded (the itch.io ZIP uploaded, the installers on the Releases page:
+[the native apps](native-apps.md#releases)).
 
 **Cleaning up.** A room with no activity for `ROOM_IDLE_MINUTES` (10)
 closes itself (an alarm); a host gone for 15 s (a reload has that long to
@@ -204,7 +236,9 @@ cd server && npm test              # the server's alone (no install needed)
 **Two tabs against the deployed server.** It allows `http://localhost:*`,
 so the game served from your computer (`python3 -m http.server 8000` from
 the repository's root, then `http://localhost:8000` in two tabs or two
-browsers) plays online through it with nothing to change. In one tab,
+browsers) plays online through it with nothing to change: it plays as
+`dev`, which the server lets in from there ([the version
+rule](#the-version-rule)). In one tab,
 Online play → a name → Create room; in the other, Online play → another
 name → Join with code (or the public list).
 
@@ -435,6 +469,8 @@ answer (`/health`):
 | "The room server doesn't accept this page's address." | The page runs from an origin missing from `ALLOWED_ORIGINS` (the game's GitHub Pages site, for one: Online Play is for the itch.io page). The message does not show the address. | Add that address to `ALLOWED_ORIGINS` in `server/wrangler.toml` and merge (Claude can). |
 | "The room server answers, but its rooms are not working right now." | The Worker answers but its Lobby (its Durable Objects) does not, or (`/health` says `"service":"alva-online"`) the Pages project cannot reach the Worker. | Open `/health` (`"lobby": false`, or the binding: step 9 [above](#putting-it-online-step-by-step)) and the Worker's **Logs** in the dashboard, and send them to Claude. |
 | "The room server can't make private connections right now." | The server has no relay key (`/health` says `"relay":false`), so it makes no room. | Add the two secrets: [its relay](#its-relay-private-connections). |
+| "A new version of Alva is out. Update to play online." | The game is not the server's `CURRENT_VERSION` (`/health?version=…` says `"versionAllowed":false`; `"currentVersion"` is the server's). | The player updates (a native app's Get the update, a refreshed page). If it is the newest copy that is refused, `CURRENT_VERSION` was deployed ahead of it, or the itch.io upload is older: upload the ZIP built from the same commit. |
+| "Online play needs a connection this copy of Alva can't make…" | The copy has no WebRTC (the Linux desktop app: [the native apps](native-apps.md#the-desktop-apps-tauri)). Nothing reaches the server. | Play online in a browser (itch.io's page) on that computer. |
 | "Couldn't connect to your opponent. One of your networks may be blocking it." (in a room) | The link through the relay did not open within 10 s: Cloudflare's TURN service did not answer, the key is wrong, or a network blocks the relay. | Try again; if it keeps happening, check the two secrets and the Worker's **Logs** ("no relay password from the TURN service"), or try another network. |
 | "The room server answers now: try again in a moment." | It failed once, then answered. | Try again. |
 
@@ -464,7 +500,6 @@ refused origin and every unexpected error, with what failed.
   deployed. A deploy restarts the rooms' connections: the game reconnects
   to its room by itself within a few seconds, and a match under way is not
   affected (it never goes through the server).
-- **A new release of the game:** a room only takes a guest whose game has
-  the host's `CONFIG.version` (`js/config.js`), so two players never mix
-  versions in a match. Raise it with any release that changes how a match
-  plays (an old tab left open would otherwise meet a new one and desync).
+- **A new release of the game:** `CURRENT_VERSION` follows package.json's
+  version, and only that version plays ([the version rule](#the-version-rule));
+  deploy it last, once the new version can be downloaded.

@@ -280,6 +280,14 @@ and checks it on GitHub and keeps the ZIP on the run
 (`.github/workflows/itch-release.yml`). Upload the ZIP to itch.io by hand as
 an HTML game. More in [the itch.io release](docs/development/itch-release.md).
 
+Native apps for Windows, macOS, Linux and Android wrap that same release
+(Tauri for the desktop, Capacitor for Android; `npm run build:desktop`,
+`npm run build:android`), installed from their own installers, with no
+app store. Every pull request builds all of them and keeps the installers
+on the run (`.github/workflows/native-apps.yml`). Their version is
+`package.json`'s, and Online Play only plays on the current version. More
+in [the native apps](docs/development/native-apps.md).
+
 ## Controls
 
 | Action | Keyboard | Controller (PlayStation / Xbox) |
@@ -345,6 +353,11 @@ tests/                  systems/, fighters/<id>/, interface/, integration/, onli
 docs/                   architecture, systems, characters, gameplay, development
 tools/itch/             the optional itch.io release export, its validation and
                         its equivalence check (package.json: esbuild, dev only)
+tools/native/           the native apps' build helpers (installers, icons)
+src-tauri/              the desktop apps (Windows, macOS, Linux): a Tauri window
+                        around the itch.io release
+android/                the Android app: a Capacitor WebView around the itch.io
+                        release (capacitor.config.json at the root)
 server/                 Online Play's room server: a Cloudflare Worker, deployed on
                         its own (never part of the game's files)
 ALVA_SPEC.md            the product specification
