@@ -444,7 +444,7 @@ test('the removed fighters are gone: no definition, art, tests, helpers, or icon
   for (const name of ['0002_fall.png', '0002_hurt.png', '0002_jump.png', '0002_land.png', '0002_midairhurt.png']) {
     assert.equal(exists(`assets/characters/0002/${name}`), false, name);
   }
-  const testFiles = readdirSync(new URL('tests/', ROOT), { recursive: true }).map((f) => f.split('/').pop());
+  const testFiles = readdirSync(new URL('tests/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).map((f) => f.split('/').pop());
   for (const id of REMOVED) {
     assert.equal(getCharacter(id), null, id);
     assert.equal(getPlayableCharacter(id), null, id);

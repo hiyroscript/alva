@@ -635,7 +635,7 @@ test('difficulty never changes the fighter: identical stats on every level, befo
 
 test('the controller only reads the game: no writes to fighters, no raw input, no unseeded randomness', () => {
   const dir = new URL('../../js/game/ai/', import.meta.url);
-  const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith('.js'));
+  const files = readdirSync(dir, { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js'));
   assert.ok(files.includes('combat-ai.js') && files.includes('moveset.js') && files.some((f) => f.startsWith('cpu-intelligence')));
   for (const file of files) {
     const src = readFileSync(new URL(file, dir), 'utf8').replace(/\/\/.*$/gm, '');

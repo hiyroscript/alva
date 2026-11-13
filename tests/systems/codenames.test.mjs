@@ -352,7 +352,7 @@ test('#0001\'s folder holds only codename files, none under a retired stem, ever
 // ---- Retired names ------------------------------------------------------------
 
 test('no retired attack, control, animation or file name is left in the game code, the stylesheet or the page', () => {
-  const files = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
+  const files = readdirSync(new URL('js/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
   for (const file of [...files, ...stylesheetFiles(), 'index.html']) {
     const lines = read(file).split('\n');
     const hit = lines.findIndex((line) => RETIRED_CODE.test(line));
@@ -366,9 +366,9 @@ test('no retired attack, control, animation or file name is left in the game cod
 });
 
 test('no retired name is left in the tests or the current documentation either', () => {
-  const tests = readdirSync(new URL('tests/', ROOT), { recursive: true })
+  const tests = readdirSync(new URL('tests/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/'))
     .filter((f) => f.endsWith('.mjs') && !f.endsWith('codenames.test.mjs')).map((f) => `tests/${f}`);
-  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
+  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
   assert.ok(tests.length > 40 && docs.length > 0);
   for (const file of [...tests, 'README.md', 'ALVA_SPEC.md', 'CLAUDE.md', ...docs]) {
     const lines = read(file).split('\n');
@@ -499,8 +499,8 @@ test('no input snapshot carries Transform, and K presses nothing in play while s
 });
 
 test('the retired Transform action is gone from the game code, the stylesheet, the page and the current documentation', () => {
-  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
-  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
+  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
+  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
   const files = [
     ...code, ...stylesheetFiles(), 'index.html', 'manifest.webmanifest',
     'README.md', 'ALVA_SPEC.md', 'CLAUDE.md', 'codename_rule', ...docs,

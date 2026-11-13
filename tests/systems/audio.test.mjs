@@ -8,6 +8,7 @@
 // Shield's hum held and dropped, overtime's intensity read from the battle,
 // and Settings › Audio's version 12.
 
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -44,7 +45,7 @@ globalThis.Path2D ??= class {
   }
 };
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DEF = getCharacter('0001');
 
 // ---- Helpers ------------------------------------------------------------------------
@@ -239,7 +240,7 @@ test('the guard: exactly the sixteen kinds the owner asked for, 37 pieces in all
     for (const name of readdirSync(dir)) {
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
-      else if (name.endsWith('.js')) sources.push([path.slice(ROOT.length), readFileSync(path, 'utf8')]);
+      else if (name.endsWith('.js')) sources.push([path.slice(ROOT.length).replaceAll('\\', '/'), readFileSync(path, 'utf8')]);
     }
   };
   walk(join(ROOT, 'js'));

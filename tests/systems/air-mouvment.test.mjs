@@ -7,6 +7,7 @@
 // number per airtime, given back on landing and by a hit; its speed carries
 // on after it. Uses the real Fighter, CombatSystem and combat AI (see
 // tests/helpers/fighter-harness.mjs), against both fighters.
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -21,7 +22,7 @@ import { mulberry32 } from '../../js/core/utils.js';
 import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
 import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DEF_0001 = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
 const FIGHTERS = [DEF_0001, DEF_0002];

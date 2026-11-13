@@ -3,13 +3,14 @@
 // frames are, and just enough canvas for the SpriteSet normalizer to read
 // their pixels, so a test can check what the game makes of the real files
 // (sizes, anchors, portraits). Paint and layout still need a real browser.
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { characterFramePaths } from '../../js/data/characters.js';
 import { buildFighterSprites } from '../../js/game/rendering/ensemble.js';
 
-export const ROOT = new URL('../../', import.meta.url).pathname;
+export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 // The pixels of the PNG at `path`: { naturalWidth, naturalHeight, pixels }
 // (RGBA, row by row), as an image the normalizer can draw.

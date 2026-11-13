@@ -649,7 +649,7 @@ test('index.html links the manifest and the touch icon relatively, beside the ex
   assert.match(read('js/core/app.js'), /this\.installDialog = new InstallDialog\(document\.getElementById\('install-dialog'\), this\);/);
   assert.doesNotMatch(html, /href="\/(?!\/)/, 'nothing from the domain root');
   // Every module of js/core/, its audio engine's folder included.
-  const coreFiles = readdirSync(new URL('js/core/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js'));
+  const coreFiles = readdirSync(new URL('js/core/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js'));
   const code = coreFiles.map((f) => read(`js/core/${f}`)).join('\n') + read('js/main.js');
   assert.doesNotMatch(code, /serviceWorker\.register|caches\.open/, 'no offline cache to fill storage or serve a stale game');
   assert.equal(existsSync(new URL('sw.js', ROOT)), false);

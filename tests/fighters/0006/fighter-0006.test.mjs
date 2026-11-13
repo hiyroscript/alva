@@ -16,6 +16,7 @@
 // characters named nowhere. The shared ensemble rules it is built on are
 // checked on made-up formations and a test-only fighter in
 // tests/systems/ensemble.test.mjs. Paint still needs a real browser.
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -746,7 +747,7 @@ test('its credits are the sheet\'s, in both languages, and its source characters
   const show = new RegExp(['power', 'puff'].join(''), 'i');
   const names = new RegExp(`\\b(${['P' + 'PG', 'Town' + 'sville', 'Mojo ' + 'Jojo', 'Butter' + 'cup', 'Bub' + 'bles'].join('|')})\\b|(?<!Cherry )\\b${'Blos' + 'som'}\\b(?! Impact)`);
   const banned = { test: (text) => show.test(text) || names.test(text) };
-  const scan = (dir) => readdirSync(new URL(dir, `file://${ROOT}`), { recursive: true })
+  const scan = (dir) => readdirSync(new URL(dir, pathToFileURL(ROOT)), { recursive: true }).map((f) => f.replaceAll('\\', '/'))
     .filter((f) => /\.(js|mjs|md|html|css|json|webmanifest)$/.test(f)).map((f) => `${dir}${f}`);
   for (const path of [...scan('js/'), ...scan('docs/'), ...scan('tests/'), 'README.md', 'ALVA_SPEC.md', 'UPDATES.md', 'CLAUDE.md', 'index.html']) {
     const lines = readFileSync(`${ROOT}${path}`, 'utf8').split('\n');
