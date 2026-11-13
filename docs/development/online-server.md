@@ -61,8 +61,8 @@ Windows, `https://alva.app` for the Android app; `parseOrigins` reads the
 `http://localhost:*` / `http://127.0.0.1:*` for testing. The game's own
 site on GitHub Pages is not on it, so Online Play is for the itch.io page
 (adding `https://hiyroscript.github.io` to the list would open it there
-too). Change the list there and deploy again (merging into `main` does);
-no code changes. The Origin of a WebSocket upgrade
+too). Change the list there and deploy again (merging into `main` does:
+[deploys](#deploys)); no code changes. The Origin of a WebSocket upgrade
 is held to the same list.
 
 **No accounts, no personal data.** No login, cookie or stored identity: the
@@ -214,7 +214,7 @@ amount, each a line in `server/wrangler.toml`:
   ("Online play is closed right now. Please try again later.", back Home;
   a room still open closes when a player connects or asks for the relay);
   `"true"` opens it again. The rest of the game is not affected. Merging
-  the change deploys it.
+  the change deploys it ([deploys](#deploys)).
 
 What is left: a password already handed out keeps working until its hour
 is up, even once Online play has closed, and a copied one could be used
@@ -380,6 +380,29 @@ themselves (a change to the server's code or to a `wrangler.toml` reaches
 them that way, with nothing to run). If the dashboard offers builds for
 other branches than `main`, they can be turned off: only `main` matters.
 
+### Deploys
+
+Since the [native apps](native-apps.md) and their automatic releases, the
+Worker is no longer deployed by Cloudflare from GitHub (its Workers Builds
+connection is turned off: **Workers & Pages › alva-rooms › Settings ›
+Build › Disconnect**), because a release must put its `CURRENT_VERSION` live
+last, once its downloads exist. GitHub deploys it instead, with the
+repository's secrets `CLOUDFLARE_API_TOKEN` (a token from Cloudflare's "Edit
+Cloudflare Workers" template) and `CLOUDFLARE_ACCOUNT_ID`:
+
+- **Every release**, last ([releases](native-apps.md#releases)), with the
+  new `CURRENT_VERSION`, its `/health` checked.
+- **Every merge into `main` that changes `server/`**
+  ([`.github/workflows/room-server.yml`](../../.github/workflows/room-server.yml)):
+  `ONLINE_OPEN`, a cap, the allowed origins, the code. The server's tests
+  first, then the deploy and `/health`. It deploys only a `CURRENT_VERSION`
+  already released (it never puts a new version live), never while a
+  release runs, and does nothing without Cloudflare's key. **Actions › Room
+  server › Run workflow** deploys by hand.
+
+The Pages project (`alva-online`, the address) still deploys itself from
+GitHub: it only passes requests on and has no version.
+
 ### Its relay (private connections)
 
 Every match goes through Cloudflare's TURN relay, so neither player ever
@@ -491,8 +514,8 @@ refused origin and every unexpected error, with what failed.
 
 - **Closing or opening Online play, or changing a cap or the allowed
   origins:** edit `server/wrangler.toml`
-  in a pull request; merging it deploys the server again (with a terminal
-  instead: `npx wrangler deploy` from the `server` folder).
+  in a pull request; merging it deploys the server again ([deploys](#deploys);
+  with a terminal instead: `npx wrangler deploy` from the `server` folder).
 - **Seeing it work:** the Cloudflare dashboard, **Workers & Pages** ›
   **alva-rooms** shows its builds, requests and errors; **Durable Objects**
   shows the day's usage against the free plan.
@@ -502,4 +525,5 @@ refused origin and every unexpected error, with what failed.
   affected (it never goes through the server).
 - **A new release of the game:** `CURRENT_VERSION` follows package.json's
   version, and only that version plays ([the version rule](#the-version-rule));
-  deploy it last, once the new version can be downloaded.
+  every release sets both and deploys the server last, by itself
+  ([releases](native-apps.md#releases)).

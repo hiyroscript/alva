@@ -7,6 +7,8 @@
 //   node tools/native/collect.mjs android   Alva-1.0.0-android.apk and .aab (signed with the release
 //                                           key), or Alva-1.0.0-android-debug.apk (installable, Android's
 //                                           debug key) and Alva-1.0.0-android-unsigned.aab without it
+//   node tools/native/collect.mjs android --release
+//                                           the signed ones, or nothing: a release is never unsigned
 //
 // The version is package.json's. Each file found is printed with its size;
 // one missing fails (exit code 1), so a build that made less than it should
@@ -19,6 +21,7 @@ export const INSTALLERS_DIR = `${DIST}/installers`;
 
 const version = releaseVersion();
 const platform = process.argv[2];
+const release = process.argv.includes('--release');
 const TAURI = 'src-tauri/target';
 const GRADLE = 'android/app/build/outputs';
 
@@ -47,7 +50,7 @@ const WANTED = {
     [TAURI, /\/bundle\/appimage\/[^/]+\.AppImage$/, `Alva-${version}-linux-x86_64.AppImage`],
     [TAURI, /\/bundle\/deb\/[^/]+\.deb$/, `Alva-${version}-linux-amd64.deb`],
   ],
-  android: existsSync(`${ROOT}${GRADLE}/apk/release/app-release.apk`)
+  android: release || existsSync(`${ROOT}${GRADLE}/apk/release/app-release.apk`)
     ? [
       [GRADLE, /\/apk\/release\/app-release\.apk$/, `Alva-${version}-android.apk`],
       [GRADLE, /\/bundle\/release\/app-release\.aab$/, `Alva-${version}-android.aab`],

@@ -13,8 +13,9 @@ plays, nothing of the game forked or copied by hand. The desktop apps are
 | [`src-tauri/`](../../src-tauri/) | The desktop apps: `tauri.conf.json` (the app, its window, its CSP, its installers), `capabilities/default.json` (all the page may ask of the app), `src/lib.rs` (the window, the opener plugin, WebRTC on Linux), `icons/`. |
 | [`capacitor.config.json`](../../capacitor.config.json), [`android/`](../../android/) | The Android app: Capacitor's configuration, and the Android Studio project `npx cap add android` made, adjusted (`app/build.gradle`: the version and signing; `AndroidManifest.xml`: landscape, the one permission; `MainActivity.java`: full screen, Back). |
 | [`js/core/native-shell.js`](../../js/core/native-shell.js) | The game's one question about where it runs (`nativeShell`: `'tauri'`, `'capacitor'` or a browser), and what an app does differently. |
-| [`tools/native/`](../../tools/native/) | `android.mjs` (the Android builds, on any computer), `collect.mjs` (the installers, named), `icons.mjs` (every icon from `assets/icons/`). |
+| [`tools/native/`](../../tools/native/) | `android.mjs` (the Android builds, on any computer), `collect.mjs` (the installers, named), `icons.mjs` (every icon from `assets/icons/`), `release.mjs` (a release's version, notes, files and checksums). |
 | [`.github/workflows/native-apps.yml`](../../.github/workflows/native-apps.yml) | Every pull request: the tests, then every installer, kept on the run. |
+| [`.github/workflows/release.yml`](../../.github/workflows/release.yml) | Every new `UPDATES.md` entry on `main`: a release, published everywhere, the room server last ([releases](#releases)). |
 
 All of it is development-only: the game never imports it, and the itch.io
 release never contains it (`DEVELOPMENT_ONLY` in
@@ -286,33 +287,135 @@ Each job first runs the tests (`node --test`, the room server's included)
 and `npm run verify:itch`; the Android job also checks the APKs ask for
 `INTERNET` alone. npm, Cargo and Gradle are cached. Every installer is an
 artifact of its own on the run's page (**Artifacts**, 90 days; GitHub
-hands each over in a ZIP of its own). Nothing is published.
+hands each over in a ZIP of its own). Nothing is published. The release
+workflow builds through this same one ([releases](#releases)), from its
+release commit and with `release` on: the Android app signed, or no build.
 
 ## Releases
 
-How releases will work once the release workflow is in (the second part of
-this work, still to come): adding an entry to `UPDATES.md` and pushing it
-to `main` releases a new version, with nothing else to do.
+**A release is an entry in `UPDATES.md`.** Push to `main` a change that
+adds a new `## ` section to `UPDATES.md` (merging a pull request that adds
+one is the usual way), and about 20 minutes later the new version is on
+the Releases page, on itch.io and on the room server, with nothing else to
+do. A push that adds no entry (an edit, a `### ` subsection, a reworded
+heading) never releases.
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml),
+its rules in [`tools/native/release.mjs`](../../tools/native/release.mjs):
 
-1. The patch version goes up in `package.json` (1.0.3 → 1.0.4, unless the
-   entry names a version), and `CURRENT_VERSION` in `server/wrangler.toml`
-   with it, committed as "Release vX.Y.Z" with the tag `vX.Y.Z`.
-2. The tests, then every platform and the itch.io ZIP, built from that
-   commit.
-3. A GitHub Release `vX.Y.Z` with every installer, the ZIP and their
-   SHA-256 checksums, its notes the new `UPDATES.md` entry;
-   <https://github.com/hiyroscript/alva/releases/latest> always the newest.
-4. With an itch.io key, each build pushed to itch.io on its own channel.
-5. Last, once all of that succeeded, the room server deployed with the new
-   `CURRENT_VERSION`: older copies lose online play only once the new
-   version can be downloaded.
+1. **Plan.** The version is the patch after `package.json`'s (1.0.3 →
+   1.0.4), unless the new entry's heading names one (`## The bounce update
+   (v1.1.0)`) or the person running it by hand does. It is never lower than
+   the current one, never one already released, and MINOR and PATCH stay
+   under 100 (past x.y.99, name x.(y+1).0). `package.json`, its lockfile and
+   `CURRENT_VERSION` in `server/wrangler.toml` are set to it in one commit,
+   "Release vX.Y.Z", by `github-actions[bot]`, kept on a branch of its own
+   (`release/vX.Y.Z`) until the release is published.
+2. **Build.** From that very commit,
+   [`native-apps.yml`](../../.github/workflows/native-apps.yml) (called by
+   the release): the tests and `verify:itch` on every runner, then every
+   installer and the itch.io ZIP. The Android app is signed with the release
+   key, or there is no release.
+3. **Publish.** Every file checked (none missing, extra or empty) and its
+   SHA-256 written to `SHA256SUMS.txt`; all of them attached to a draft
+   release; `main` brought up to the release commit (straight on, or merged
+   in when `main` moved meanwhile); then the release published as **vX.Y.Z**
+   (the tag made at the release commit), marked the latest and checked to be:
+   <https://github.com/hiyroscript/alva/releases/latest> always opens the
+   newest. Its notes are the new entry, its links made absolute, with a link
+   to [how to install](#how-to-install).
+4. **itch.io.** With the secret `BUTLER_API_KEY` and the variable
+   `ITCH_PROJECT` (`user/game`, e.g. `hiyroscript/alva`: **Settings ›
+   Secrets and variables › Actions › Variables**), each build is pushed with
+   butler to its own channel, so itch.io offers one download a system:
+   `windows` (the `.exe`), `mac` (the `.dmg`), `linux` (the `.AppImage`),
+   `android` (the `.apk`) and `html` (the ZIP). Without either, it is skipped
+   and the release goes on. The first time, on the game's itch.io page, tick
+   **This file will be played in the browser** on the `html` upload and
+   delete the older hand-made one.
+5. **The room server, last**, only once all of the above succeeded:
+   `wrangler deploy` with the new `CURRENT_VERSION` (the secrets
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`), then its `/health`
+   checked to say so. From that moment older copies are told a new version
+   is out ([the version rule](#the-version-rule)); not before, because the
+   new one can already be downloaded.
 
-Until then, a version is raised by hand: `version` in `package.json` and
-`CURRENT_VERSION` in `server/wrangler.toml` together (a test fails if they
-differ), and the server deployed after the new installers are up.
+**What it needs**, as the repository's secrets (**Settings › Secrets and
+variables › Actions**): the four `ANDROID_…` ones ([signing](#signing)),
+`CLOUDFLARE_API_TOKEN` (a token from Cloudflare's "Edit Cloudflare Workers"
+template) and `CLOUDFLARE_ACCOUNT_ID`. With any of the six missing, a
+release is **held**: the run stops at once, red, saying which, before
+anything is built, committed or published; add them and run it again. The
+room server must be deployed by this workflow alone: Cloudflare's own
+deploy from GitHub (Workers Builds) is disconnected, or it would put a new
+`CURRENT_VERSION` live before the downloads exist.
+
+**Never half published.** A failure while planning or building leaves
+nothing (the branch and any draft are removed by the run's last job). A
+failure after publishing (itch.io, the deploy) leaves the release up and
+the server on the older version: **Re-run failed jobs** on the run's page
+picks up from there. Two releases never run at once (the second waits).
+The release commit starts no other workflow (it is pushed with the
+workflow's own token, and adds no entry).
+
+**By hand:** **Actions › Release › Run workflow** on `main`, with a version
+(empty: the next patch). Its notes are the newest entry. Ticking **test**
+(or running it on any other branch) makes a **test release**: everything
+built and attached to a draft, checked, then removed, with the server's
+deploy only a dry run; nothing is pushed to `main`, published, uploaded or
+deployed. A pull request that changes the release itself
+(`release.yml`, `tools/native/release.mjs`) makes one too, so the whole
+release is tried before the change is merged.
+
+## How to install
+
+For the download pages (the Releases page, itch.io, MediaFire); the files
+are on <https://github.com/hiyroscript/alva/releases/latest>. Alva is free
+and not code-signed (that costs money every year), so each system warns
+once before the first launch. That is expected.
+
+**Windows**
+1. Download `Alva-…-windows-x64-setup.exe` and open it.
+2. If Windows says "Windows protected your PC", click **More info**, then
+   **Run anyway**.
+3. Follow the installer. Alva is in the Start menu. Updates install over it
+   the same way, keeping your progress.
+
+**Mac** (Apple silicon and Intel)
+1. Download `Alva-…-macos-universal.dmg`, open it, and drag **Alva** into
+   **Applications**.
+2. Open Alva from Applications. If macOS says it "can't be opened" or
+   "could not verify" it, click **Done**, open **System Settings › Privacy &
+   Security**, scroll down to the message about Alva, click **Open Anyway**,
+   and confirm with your password. You only do this once.
+
+**Linux**
+- **AppImage** (any distribution): download `Alva-…-linux-x86_64.AppImage`,
+  right-click it › **Properties** › **Permissions** › **Allow executing file
+  as program** (or `chmod +x Alva-*.AppImage`), then double-click it.
+- **Debian, Ubuntu and their family:** download `Alva-…-linux-amd64.deb`
+  and open it with your software installer, or
+  `sudo apt install ./Alva-*.deb`.
+- Online play needs a web browser on Linux (the itch.io page): the Linux
+  app plays everything else.
+
+**Android** (Android 7 or later)
+1. On the phone, download `Alva-….apk` and open it (from the browser's
+   downloads or the Files app).
+2. When Android asks, allow your browser (or Files app) to **install
+   unknown apps** (**Settings**, then back), and tap **Install**. If Play
+   Protect warns, tap **More details › Install anyway**.
+3. Updates install over it the same way, keeping your progress. Never
+   uninstall to update: that deletes your progress.
+
+**In the browser:** play on the itch.io page, nothing to install. Online
+play works between every copy (the apps and the browser) on the same
+version: when a new version is out, the game says so and how to update.
 
 ## Tests
 
+[`tests/interface/native-releases.test.mjs`](../../tests/interface/native-releases.test.mjs)
+(which push releases, the version rules, the notes, the version files, the
+files attached and their checksums, the release workflow's order),
 [`tests/interface/native-apps.test.mjs`](../../tests/interface/native-apps.test.mjs)
 (where the game runs, what an app does differently and a browser does not,
 Home and the small-screen block in an app, the version everywhere and the

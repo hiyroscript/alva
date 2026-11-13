@@ -1,0 +1,368 @@
+# Releases, automatic (docs/development/native-apps.md, Releases). A push to
+# main that adds an entry to UPDATES.md (a new `## ` section) releases a new
+# version; a push that adds none never does. "Run workflow" (Actions tab)
+# releases by hand, with a version or the next patch.
+#
+#   1. Plan: the version (the patch after package.json's, unless the new
+#      entry's heading or the person names one: tools/native/release.mjs),
+#      package.json and the room server's CURRENT_VERSION set to it in one
+#      commit, "Release vX.Y.Z", kept on a branch of its own for now.
+#   2. Build: the tests, every platform and the itch.io ZIP, from that very
+#      commit (.github/workflows/native-apps.yml, the Android app signed).
+#   3. Publish: every file checked and its SHA-256 written, attached to a
+#      draft release; then main brought up to the release commit, and the
+#      release published as vX.Y.Z, the latest
+#      (https://github.com/hiyroscript/alva/releases/latest), its notes the
+#      new entry.
+#   4. itch.io: with BUTLER_API_KEY (a secret) and ITCH_PROJECT (a variable,
+#      user/game), each build on its own channel; skipped without them.
+#   5. Last, the room server deployed with the new CURRENT_VERSION, and its
+#      /health checked: older copies lose online play only once the new one
+#      can be downloaded.
+#
+# Nothing is half published: a release that cannot be signed or deployed
+# (any of the six secrets missing) is held before anything is built, and a
+# failure before step 3's publishing removes the draft and the branch. Two
+# releases never run at once. The release commit is pushed with the
+# workflow's own token, which starts no other workflow, and adds no entry.
+#
+# A run on any branch but main, with "test" ticked, or for a pull request
+# that changes the release itself, is a test release: everything built and
+# attached to a draft, checked, then removed; nothing pushed to main,
+# published, uploaded or deployed (the server's deploy is a dry run).
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [UPDATES.md]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release (MAJOR.MINOR.PATCH). Empty, the next patch.
+        required: false
+        default: ''
+      test:
+        description: A test release (a draft, built, checked and removed; nothing published).
+        type: boolean
+        default: false
+  # A pull request that changes the release itself makes a test release, so
+  # the whole of it is tried before it is merged.
+  pull_request:
+    paths: [.github/workflows/release.yml, tools/native/release.mjs]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    # A pull request from a fork has no right to draft a release here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      title: ${{ steps.plan.outputs.title }}
+      tag: ${{ steps.commit.outputs.tag }}
+      sha: ${{ steps.commit.outputs.sha }}
+      branch: ${{ steps.commit.outputs.branch }}
+      test: ${{ steps.mode.outputs.test }}
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: A real release or a test
+        id: mode
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ inputs.test }}" != "true" ]; then test=false; else test=true; fi
+          echo "test=$test" >> "$GITHUB_OUTPUT"
+          echo "Test release: $test"
+
+      # Held, not failed halfway: without the release key the Android app
+      # cannot be signed, and without Cloudflare's the server cannot follow.
+      - name: Every secret a release needs
+        run: |
+          missing=""
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            if [ "${{ steps.mode.outputs.test }}" = "true" ]; then
+              echo "::warning::Not set, so a real release would be held:$missing"
+            else
+              echo "::error::Release held: the repository's secrets are missing:$missing (docs/development/native-apps.md, Releases). Nothing was built or published. Add them, then run this workflow again."
+              exit 1
+            fi
+          fi
+
+      - name: The version and the notes
+        id: plan
+        env:
+          EVENT: ${{ steps.mode.outputs.test == 'true' && 'workflow_dispatch' || github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" = "push" ] && git cat-file -e "${{ github.event.before }}:UPDATES.md" 2>/dev/null; then
+            git show "${{ github.event.before }}:UPDATES.md" > "$RUNNER_TEMP/UPDATES.before.md"
+            export BEFORE_FILE="$RUNNER_TEMP/UPDATES.before.md"
+          fi
+          export TAGS="$(git tag --list 'v*')"
+          node tools/native/release.mjs plan
+
+      - name: The release commit
+        id: commit
+        if: steps.plan.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          TEST: ${{ steps.mode.outputs.test }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "${{ steps.plan.outputs.bump }}" = "true" ]; then
+            node tools/native/release.mjs bump "$VERSION"
+            git add package.json package-lock.json server/wrangler.toml
+            git commit -m "Release v$VERSION"
+          fi
+          if [ "$TEST" = "true" ]; then
+            tag="v$VERSION-test.${{ github.run_id }}"
+            branch="release-test/${{ github.run_id }}"
+          else
+            tag="v$VERSION"
+            branch="release/v$VERSION"
+          fi
+          git push origin "HEAD:refs/heads/$branch"
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "tag=$tag"
+            echo "branch=$branch"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Keep the notes
+        if: steps.plan.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: dist/release-notes.md
+          if-no-files-found: error
+
+  apps:
+    name: Build
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    uses: ./.github/workflows/native-apps.yml
+    with:
+      ref: ${{ needs.plan.outputs.sha }}
+      release: ${{ needs.plan.outputs.test != 'true' }}
+    secrets: inherit
+
+  publish:
+    name: Publish
+    needs: [plan, apps]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      pushed: ${{ steps.main.outputs.pushed }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      TEST: ${{ needs.plan.outputs.test }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Every installer and the itch.io ZIP
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Alva-*
+          merge-multiple: true
+          path: dist/release
+
+      - name: The notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: dist
+
+      - name: Check every file and write the checksums
+        run: node tools/native/release.mjs assets dist/release "$VERSION" ${{ needs.plan.outputs.test == 'true' && '--test' || '' }}
+
+      - name: The release, as a draft
+        run: |
+          gh release create "$TAG" dist/release/* --draft --target "$SHA" \
+            --title "${{ needs.plan.outputs.title }}${{ needs.plan.outputs.test == 'true' && ' (test)' || '' }}" \
+            --notes-file dist/release-notes.md
+          expected=$(ls dist/release | wc -l)
+          attached=$(gh release view "$TAG" --json assets --jq '.assets | length')
+          echo "$attached of $expected files attached"
+          [ "$attached" = "$expected" ]
+
+      - name: A test ends here (the draft and its branch removed)
+        if: needs.plan.outputs.test == 'true'
+        run: |
+          gh release view "$TAG" --json name,isDraft,assets --jq '{name, isDraft, assets: [.assets[] | {name, size}]}'
+          gh release delete "$TAG" --yes
+          git push origin --delete "${{ needs.plan.outputs.branch }}"
+          echo "The test release was built, attached, checked and removed."
+
+      # The release commit onto main: straight on when main has not moved,
+      # merged in when it has (a release commit only touches the version).
+      - name: Main brought up to the release commit
+        id: main
+        if: needs.plan.outputs.test != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          if git merge-base --is-ancestor HEAD "$SHA"; then git merge --ff-only "$SHA"; else git merge --no-edit -m "Merge release $TAG" "$SHA"; fi
+          git push origin main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Published, the latest
+        if: needs.plan.outputs.test != 'true'
+        run: |
+          gh release edit "$TAG" --draft=false --latest
+          latest=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)
+          echo "releases/latest is $latest"
+          [ "$latest" = "$TAG" ]
+          git push origin --delete "${{ needs.plan.outputs.branch }}" || true
+
+  itch:
+    name: itch.io
+    needs: [plan, publish]
+    if: needs.plan.outputs.test != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_PROJECT: ${{ vars.ITCH_PROJECT }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: An itch.io key and project, or nothing to do
+        id: itch
+        run: |
+          if [ -n "$BUTLER_API_KEY" ] && [ -n "$ITCH_PROJECT" ]; then echo "push=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::No itch.io upload: the secret BUTLER_API_KEY or the variable ITCH_PROJECT is not set."; fi
+
+      - name: Every installer and the itch.io ZIP
+        if: steps.itch.outputs.push == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Alva-*
+          merge-multiple: true
+          path: dist/release
+
+      - name: butler, itch.io's uploader
+        if: steps.itch.outputs.push == 'true'
+        run: |
+          curl -sSfL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler
+          chmod +x butler/butler
+          butler/butler -V
+
+      # One channel a platform, so itch.io shows each download for its own
+      # system; html is the page played in the browser.
+      - name: Each build on its channel
+        if: steps.itch.outputs.push == 'true'
+        run: |
+          push() { butler/butler push "dist/release/$1" "$ITCH_PROJECT:$2" --userversion "$VERSION"; }
+          push "Alva-$VERSION-windows-x64-setup.exe" windows
+          push "Alva-$VERSION-macos-universal.dmg" mac
+          push "Alva-$VERSION-linux-x86_64.AppImage" linux
+          push "Alva-$VERSION-android.apk" android
+          push alva-itch.zip html
+
+  deploy:
+    name: Room server
+    needs: [plan, publish, itch]
+    if: always() && needs.plan.outputs.release == 'true' && needs.publish.result == 'success' && (needs.itch.result == 'success' || needs.itch.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install wrangler
+        working-directory: server
+        run: npm ci
+
+      - name: A test checks the deploy without making it
+        if: needs.plan.outputs.test == 'true'
+        working-directory: server
+        run: |
+          npx wrangler deploy --dry-run | tee "$RUNNER_TEMP/dry-run.txt"
+          grep -F "CURRENT_VERSION (\"$VERSION\")" "$RUNNER_TEMP/dry-run.txt"
+
+      - name: Deploy, with the new CURRENT_VERSION
+        if: needs.plan.outputs.test != 'true'
+        working-directory: server
+        run: npx wrangler deploy
+
+      - name: The server plays with the new version
+        if: needs.plan.outputs.test != 'true'
+        run: |
+          url="$(node -e "import('./js/config.js').then((m) => console.log(m.CONFIG.online.serverUrl))")/health"
+          for i in $(seq 1 18); do
+            current="$(curl -sS "$url" | node -e "let s='';process.stdin.on('data',(d)=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).currentVersion)}catch{console.log('')}})")"
+            echo "$url: currentVersion $current"
+            [ "$current" = "$VERSION" ] && exit 0
+            sleep 10
+          done
+          echo "::error::The room server does not report $VERSION after three minutes."
+          exit 1
+
+  # A release that failed before it was published leaves nothing behind:
+  # its draft and its branch are removed (a published one is never touched).
+  cleanup:
+    name: Clean up a release that failed
+    needs: [plan, apps, publish]
+    if: always() && needs.plan.outputs.release == 'true' && needs.publish.result != 'success' && needs.publish.outputs.pushed != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - name: The draft and the branch removed
+        run: |
+          if [ "$(gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+            gh release delete "$TAG" --repo "${{ github.repository }}" --yes
+          fi
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${{ needs.plan.outputs.branch }}" || true
