@@ -7657,3 +7657,30 @@ not the repository's own (`tests/helpers/repository.mjs`: the native
 builds, and the lockfiles, one of whose random hashes matched a name
 pattern by chance). The itch.io release still builds (14 files) and plays
 all 60 equivalence scenarios exactly as the source.
+
+### Later: automatic releases
+
+The brief's second part. A push to `main` that adds an entry to this file
+releases a new version by itself
+(`.github/workflows/release.yml`, [the native apps](./docs/development/native-apps.md#releases)):
+the patch after `package.json`'s (1.0.3 → 1.0.4) unless the entry's
+heading or the person running it by hand names one (`v1.1.0`), set in
+`package.json`, its lockfile and the room server's `CURRENT_VERSION` in one
+commit, "Release vX.Y.Z"; the tests and every platform built from that
+commit (`native-apps.yml`, now also called by the release, the Android app
+signed or no release at all); a GitHub Release `vX.Y.Z` with every
+installer, the itch.io ZIP and `SHA256SUMS.txt`, its notes the new entry,
+published as the latest; each build pushed to itch.io on its own channel
+when `BUTLER_API_KEY` and `ITCH_PROJECT` are set; and last, the room server
+deployed with the new version and its `/health` checked. A release missing
+any of its six secrets is held before anything is built; one that fails
+before it is published leaves no draft or branch behind; two never run at
+once. "Run workflow" with **test** builds everything into a draft, checks
+it and removes it. This part is a subsection rather than an entry of its
+own on purpose: an entry would itself start a release.
+
+**Code:** `tools/native/release.mjs` (new: the plan, the version rules, the
+notes, the version files, the files attached and their checksums),
+`tools/native/collect.mjs` (`--release`), `.github/workflows/release.yml`
+(new), `.github/workflows/native-apps.yml` (`workflow_call`).
+**Tests:** new `tests/interface/native-releases.test.mjs`.

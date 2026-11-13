@@ -15,20 +15,36 @@
 # an installable debug APK and an unsigned AAB. The desktop apps are not
 # signed (free: no certificate): Windows SmartScreen and macOS Gatekeeper
 # warn before the first launch.
+#
+# The release workflow (.github/workflows/release.yml) builds every app the
+# same way through this one, from its release commit (`ref`), with
+# `release` on: the Android app must then be signed, and the run stops
+# before anything is built when the key is missing.
 
 name: Native apps
 
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit to build (the release commit).
+        type: string
+        required: true
+      release:
+        description: A release's build, the Android app signed with the release key or not built at all.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
-# A newer push to the same pull request replaces a run still going.
+# A newer push to the same pull request replaces a run still going; a
+# release's build is never cancelled.
 concurrency:
-  group: native-apps-${{ github.ref }}
-  cancel-in-progress: true
+  group: native-apps-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   desktop:
@@ -65,6 +81,8 @@ jobs:
         run: git config --global core.autocrlf false
 
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-node@v5
         with:
@@ -171,6 +189,8 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-node@v5
         with:
@@ -200,6 +220,14 @@ jobs:
 
       - name: Play the bundle against the source
         run: npm run verify:itch
+
+      # A release is signed or not made: without the four secrets it stops
+      # here, before anything is built.
+      - name: A release needs the release key
+        if: inputs.release && (env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_KEYSTORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '')
+        run: |
+          echo "::error::A release needs the Android release key: the repository's secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD (docs/development/native-apps.md, Signing)."
+          exit 1
 
       # The key exists only in this job's temporary folder, never in the
       # workspace or a log; Gradle reads its path and passwords from the
@@ -235,7 +263,7 @@ jobs:
       - name: Name the installers
         id: installers
         run: |
-          node tools/native/collect.mjs android
+          node tools/native/collect.mjs android ${{ inputs.release && '--release' || '' }}
           echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           ls dist/installers
 
