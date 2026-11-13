@@ -140,6 +140,12 @@ test('the release workflow: a new entry or a person starts it, one at a time, bu
     assert.match(yml, new RegExp(`for name in [^\\n]*\\b${name}\\b`), name);
   }
   assert.match(yml, /Release held: the repository's secrets are missing/);
+  // Only once there is a release to make: a push that adds no entry ends
+  // quietly, secrets or not, and the check comes before the release commit.
+  const plan = yml.split('\n  plan:\n')[1].split(/\n  [a-z]+:\n/)[0];
+  const check = plan.indexOf('- name: Every secret a release needs');
+  assert.ok(check > plan.indexOf('- name: The version and the notes') && check < plan.indexOf('- name: The release commit'));
+  assert.match(plan.slice(check), /^- name: Every secret a release needs\n        if: steps\.plan\.outputs\.release == 'true'\n/);
   // The order: plan → build (every app, from the release commit, signed) →
   // publish (draft, main, then published as the latest) → itch.io → server.
   // A job's lines, from its name to the next job's.
