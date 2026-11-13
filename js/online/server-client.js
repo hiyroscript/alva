@@ -4,11 +4,11 @@
 //
 // Every failure is an OnlineError whose `code` the screens translate: the
 // server's own codes ('full', 'invalid_name', 'room_not_found',
-// 'room_full', 'rate_limited', 'version_mismatch', …) or 'unavailable' when
-// the server cannot be reached at all: no address configured
-// (CONFIG.online.serverUrl empty), the network failing, a timeout, or an
-// answer that is not the server's. "Servers are full" and "Online play is
-// unavailable" are told apart this way.
+// 'room_full', 'rate_limited', 'version_mismatch', 'outdated', …) or
+// 'unavailable' when the server cannot be reached at all: no address
+// configured (CONFIG.online.serverUrl empty), the network failing, a
+// timeout, or an answer that is not the server's. "Servers are full" and
+// "Online play is unavailable" are told apart this way.
 
 import { CONFIG } from '../config.js';
 import { listeners } from './transport.js';
@@ -27,6 +27,10 @@ export class OnlineError extends Error {
 
 // `url` with no trailing slash.
 const trimmed = (url) => String(url ?? '').trim().replace(/\/+$/, '');
+
+// The game's version as a GET request's query (the server's version rule
+// reads it), or nothing.
+const versionQuery = (version) => (version ? `?version=${encodeURIComponent(version)}` : '');
 
 export class RoomServerClient {
   constructor({
@@ -80,23 +84,26 @@ export class RoomServerClient {
   // to say: 'not_configured' (no address), 'unreachable' (no answer at all:
   // down, blocked, or not deployed), 'origin' (it answers, but this page's
   // origin is not one it accepts), 'server_error' (it answers, its Lobby
-  // does not), 'relay' (it answers, but has no relay for private
-  // connections, so it makes no room) or 'reachable' (it answers and would
-  // accept this page).
-  // `origin` is this page's, as the server saw it when it says. Never
-  // throws.
-  async diagnose() {
+  // does not), 'outdated' (it answers, but plays with another version than
+  // `version`, the game's), 'relay' (it answers, but has no relay for
+  // private connections, so it makes no room) or 'reachable' (it answers
+  // and would accept this page).
+  // `origin` is this page's (location.origin: in a native app, the app's
+  // own fixed address, docs/development/native-apps.md), as the server saw
+  // it when it says. Never throws.
+  async diagnose({ version = null } = {}) {
     const page = globalThis.location?.origin ?? null;
     if (!this.configured) return { code: 'not_configured', origin: page };
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = setTimeout(() => controller?.abort(), this.timeoutMs);
     try {
-      const res = await this.fetch(`${this.baseUrl}/health`, { signal: controller?.signal });
+      const res = await this.fetch(`${this.baseUrl}/health${versionQuery(version)}`, { signal: controller?.signal });
       const data = await res.json().catch(() => null);
       if (!data || typeof data !== 'object') return { code: 'unreachable', origin: page };
       const origin = typeof data.origin === 'string' ? data.origin : page;
       if (data.originAllowed === false) return { code: 'origin', origin };
       if (data.ok === false || data.lobby === false) return { code: 'server_error', origin };
+      if (data.versionAllowed === false) return { code: 'outdated', origin };
       if (data.relay === false) return { code: 'relay', origin };
       return { code: 'reachable', origin };
     } catch {
@@ -106,8 +113,10 @@ export class RoomServerClient {
     }
   }
 
-  async listRooms() {
-    const data = await this.request('/rooms');
+  // The public rooms, for a game of `version` (refused as 'outdated' when
+  // the server plays with another).
+  async listRooms({ version = null } = {}) {
+    const data = await this.request(`/rooms${versionQuery(version)}`);
     return Array.isArray(data.rooms) ? data.rooms : [];
   }
 

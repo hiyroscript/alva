@@ -26,6 +26,7 @@ import { cooldownIndicators } from '../../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../../js/ui/mobile-abilities.js';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
+import { notOurs } from '../helpers/repository.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -351,7 +352,7 @@ test('#0001\'s folder holds only codename files, none under a retired stem, ever
 // ---- Retired names ------------------------------------------------------------
 
 test('no retired attack, control, animation or file name is left in the game code, the stylesheet or the page', () => {
-  const files = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
+  const files = readdirSync(new URL('js/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
   for (const file of [...files, ...stylesheetFiles(), 'index.html']) {
     const lines = read(file).split('\n');
     const hit = lines.findIndex((line) => RETIRED_CODE.test(line));
@@ -365,9 +366,9 @@ test('no retired attack, control, animation or file name is left in the game cod
 });
 
 test('no retired name is left in the tests or the current documentation either', () => {
-  const tests = readdirSync(new URL('tests/', ROOT), { recursive: true })
+  const tests = readdirSync(new URL('tests/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/'))
     .filter((f) => f.endsWith('.mjs') && !f.endsWith('codenames.test.mjs')).map((f) => `tests/${f}`);
-  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
+  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
   assert.ok(tests.length > 40 && docs.length > 0);
   for (const file of [...tests, 'README.md', 'ALVA_SPEC.md', 'CLAUDE.md', ...docs]) {
     const lines = read(file).split('\n');
@@ -391,12 +392,9 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
 // Every file and folder of the repository but its git store, as paths.
 function repositoryPaths(dir = '') {
   return readdirSync(new URL(dir || './', ROOT), { withFileTypes: true }).flatMap((e) => {
-    // Not the repository's own: Git's store, npm's packages, the generated
-    // itch.io release (dist/, ignored by Git: copies of files read here) and
-    // the room server's local cache (server/.wrangler/, ignored by Git:
-    // what `npx wrangler dev` builds and stores).
-    if (e.name === '.git' || e.name === 'node_modules' || e.name === 'dist' || e.name === '.wrangler') return [];
+    // Not the repository's own (tests/helpers/repository.mjs).
     const path = `${dir}${e.name}`;
+    if (notOurs(path)) return [];
     return e.isDirectory() ? [`${path}/`, ...repositoryPaths(`${path}/`)] : [path];
   });
 }
@@ -501,8 +499,8 @@ test('no input snapshot carries Transform, and K presses nothing in play while s
 });
 
 test('the retired Transform action is gone from the game code, the stylesheet, the page and the current documentation', () => {
-  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
-  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
+  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
+  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
   const files = [
     ...code, ...stylesheetFiles(), 'index.html', 'manifest.webmanifest',
     'README.md', 'ALVA_SPEC.md', 'CLAUDE.md', 'codename_rule', ...docs,

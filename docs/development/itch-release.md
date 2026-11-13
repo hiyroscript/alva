@@ -84,7 +84,12 @@ dist/
   Nothing in the game reads a function's or class's `name`, `eval`s code,
   imports dynamically or uses `import.meta`, so neither changes anything;
   top-level `const` and `class` become module-scoped `var`, which differs
-  only for code that would already throw. Every asset path is relative to
+  only for code that would already throw. One thing is written in: the
+  release's version, package.json's, over `globalThis.ALVA_RELEASE_VERSION`
+  (esbuild's `define`, `releaseDefine`), which `CONFIG.version` reads; the
+  modules as they are read nothing there and play as `dev`. Only Online
+  Play looks at it ([the version rule](../gameplay/online-play.md#the-version-rule)),
+  so a match plays the same. Every asset path is relative to
   the page (`./assets/...`), never to a module, so paths resolve as before.
   `window.alva` is there as before.
 - **CSS.** The parts are joined, never rewritten, minified or reordered: the
@@ -118,7 +123,9 @@ dist/
 - **Left out.** Everything development-only (`DEVELOPMENT_ONLY` in
   `release.mjs`, which the build and the validation share): `tests/`,
   `docs/`, `tools/`, the room server (`server/`, deployed to Cloudflare on
-  its own: [the room server](online-server.md)), the specification and
+  its own: [the room server](online-server.md)), the native apps' shells
+  (`src-tauri/`, `android/`, `capacitor.config.json`: they wrap this
+  release, [the native apps](native-apps.md)), the specification and
   Markdown, `codename_rule`, `character_rule`, `max`, `package.json`,
   `node_modules/`, `.nojekyll` (GitHub Pages only) and Git. The build
   copies only what the page loads and refuses to copy anything on that
@@ -138,6 +145,7 @@ build and on its own:
 - Current: `index.html` is the page the repository makes now, `game.css`
   the parts joined in order, `game.js` every module of the page's graph,
   once each, in ES evaluation order (read from the source's own imports),
+  with package.json's version written in,
   every copied file identical to the repository's and nothing extra, and
   `game-assets.js` exactly the files of `assets/characters/`, each read
   back (`readPack`) byte for byte identical to the repository's, none
@@ -147,8 +155,9 @@ build and on its own:
   every registered fighter (from the registry itself, in the pack), every
   manifest icon.
 - No other host ([`tools/itch/hosts.mjs`](../../tools/itch/hosts.mjs)):
-  the only addresses (http, https, ws or wss) are the credits' links to the
-  sprite sources (opened by the player, never loaded) and, for Online Play,
+  the only addresses (http, https, ws or wss) are the links the player
+  opens, never loaded (the credits' links to the sprite sources, and the
+  Releases page a native app's update button opens) and, for Online Play,
   the room server: the single host in `CONFIG.online.serverUrl` and its
   WebSocket form (wss for https). No script, style or image from
   elsewhere, and no other path to another host (not even the server's

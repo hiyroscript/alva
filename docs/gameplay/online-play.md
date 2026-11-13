@@ -24,6 +24,7 @@ guide: [the room server](../development/online-server.md).
 | [`js/online/match-setup.js`](../../js/online/match-setup.js) | What a start message means: the stage drawn from the seed (`stageForSeed`), both fighters, names and Automatic turn-around (`readStart`). |
 | [`js/online/rules.js`](../../js/online/rules.js) | Names, room names and room codes: what a player may type (the server checks again with its own copy). |
 | [`js/core/connectivity.js`](../../js/core/connectivity.js) | `Connectivity`: whether the device is online, live. |
+| [`js/core/native-shell.js`](../../js/core/native-shell.js) | Whether the game runs in a native app, and opening the Releases page in the player's browser (the update button: [the version rule](#the-version-rule)). |
 | [`js/game/battle.js`](../../js/game/battle.js) | `BATTLE_MODES.online`: a `PlayerController` on each side, each on its lockstep channel; `labels` (the players' names), per-player Automatic turn-around, `forfeit`. |
 | [`js/game/arena.js`](../../js/game/arena.js) | `Arena.advance`: the fixed steps, which an online match hands to its `stepper` (the lockstep). |
 
@@ -69,6 +70,12 @@ Going offline anywhere in Online Play ends it: the room is left, Home, and
   opens again next month." (`month_limit`, the relay's safety stop); the
   lobby and a room still open say the same if it closes while they show
   ([the relay's safeguards](../development/online-server.md#the-relays-safeguards)).
+  A copy of another version than the server's is told a new version is
+  out ([the version rule](#the-version-rule)), then Home. A copy that
+  cannot link to another player at all (no WebRTC: `matchLink.supported`,
+  false in the Linux desktop app, whose WebKitGTK has none) says so before
+  asking the server: "Online play needs a connection this copy of Alva
+  can't make. Play online in a web browser instead.", then Home.
 - **Typing.** While a text field has focus, the keys that type are the
   field's ([input](../systems/input.md#text-fields)): ↑ ↓ and Esc still
   navigate, Enter submits the field.
@@ -243,9 +250,8 @@ fighter, Ready, Rematch and whether they are connected.
   the same answers), so even a copy of the game that tried a direct link
   could not pass an address through it. What a browser takes is scrubbed
   too.
-- **Older copies.** A copy plays online as `ONLINE_VERSION`
-  (`js/online/online-session.js`: the game's version marked `+turn`);
-  older copies show as "Other version".
+- **Older copies** never play at all ([the version rule](#the-version-rule)),
+  so none of them can be a way around the relay.
 - **The server keeps none.** Its per-minute limits count a salted hash of
   the caller's address, in memory only, and Cloudflare's per-request logs
   are off ([the room server](../development/online-server.md#privacy)).
@@ -255,6 +261,31 @@ fighter, Ready, Rematch and whether they are connected.
   host does. A relay password reaches the player it is for (their browser
   needs it), so someone could copy theirs: it stops working within the
   hour, and the server hands out at most 120 an hour.
+
+## The version rule
+
+Online play is for the current release only, on every platform, itch.io's
+page and the [native apps](../development/native-apps.md) alike. A copy
+plays online as `ONLINE_VERSION` (`js/online/online-session.js`):
+`CONFIG.version`, package.json's version written into the release's bundle
+when it is built, or `dev` for the modules run as they are. It goes with
+the reachability check (`diagnose`: `/health?version=`), the list
+(`/rooms?version=`), creating and joining (the body's `version`), and the
+room server refuses any but its `CURRENT_VERSION` as `outdated` (`dev` only
+from `http://localhost` or `http://127.0.0.1`: [the room
+server](../development/online-server.md#the-version-rule)). A room keeps its
+host's version, so a public room of another shows "Other version", and a
+room left from an older release closes as `outdated` for both players.
+
+`outdated` ends Online Play (it is one of `CLOSED`) with `showOutdated`: "A
+new version of Alva is out. Update to play online.", then Home. In a native
+app (`isNativeApp`) the dialog offers **Get the update**, which opens
+<https://github.com/hiyroscript/alva/releases/latest> in the player's
+browser (`openExternal`), and **Not now**; in a browser it adds "Refresh
+this page to get it (or download Alva again if you play a downloaded
+copy)." with one button. Nothing else of the game looks at the version:
+Local Play, Adventure, Practice Ground, Watch Mode and everything offline
+play on any.
 
 ## Rollback, later
 
@@ -280,7 +311,10 @@ flushes, muting, slow motion, catching up),
 (Home, the name, the lobby, the room, the battle and its rules, on the real
 server code in process), [`tests/online/match-link.test.mjs`](../../tests/online/match-link.test.mjs)
 (the relay's servers first, no link without them, and a match over the
-relay through the real room server's code), [`tests/online/peer-privacy.test.mjs`](../../tests/online/peer-privacy.test.mjs)
+relay through the real room server's code), the version rule in
+`online-play.test.mjs` (an outdated copy in a browser and in an app, the
+version sent with every call, `dev` from a computer's own address only, a
+room closed by a release, a copy with no WebRTC), [`tests/online/peer-privacy.test.mjs`](../../tests/online/peer-privacy.test.mjs)
 (the relay's link relay-only with TURN servers alone, never without one,
 only scrubbed relay candidates sent or taken),
 [`tests/online/delay.test.mjs`](../../tests/online/delay.test.mjs)

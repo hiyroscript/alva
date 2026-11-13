@@ -36,6 +36,13 @@
 // how to install later), 'failed' (the browser refused to prompt) or
 // 'installed'. Listeners (onChange) hear every change of mode or status.
 // Nothing here touches the game or its storage.
+//
+// Inside one of Alva's native apps (js/core/native-shell.js) the game is
+// already an installed app: `mode` is 'installed' from the start, and
+// nothing offers to install it (Home and the small-screen block hide their
+// Download).
+
+import { isNativeApp } from './native-shell.js';
 
 // Display modes an installed web app may run in.
 const APP_DISPLAY_MODES = Object.freeze(['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay']);
@@ -91,8 +98,10 @@ export const INSTALL_INSTRUCTIONS = Object.freeze({
   other: Object.freeze({ heading: 'install.howTo', text: 'install.other' }),
 });
 
-// Whether the page is running as an installed app (see above).
+// Whether the page is running as an installed app (see above): one of the
+// native apps, or an installed web app.
 export function runningInstalled(win = globalThis.window) {
+  if (isNativeApp(win)) return true;
   if (win?.navigator?.standalone === true) return true;
   const mq = win?.matchMedia;
   if (typeof mq !== 'function') return false;

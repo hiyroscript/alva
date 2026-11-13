@@ -658,7 +658,7 @@ test('hit-cancels and follow-ups: the smarter levels chain their attacks within 
 test('Rule C: no fighter is named anywhere in the CPU', () => {
   const dir = new URL('../../js/game/ai/', import.meta.url);
   const ids = FIGHTERS.flatMap((D) => [D.id, D.displayName].filter(Boolean));
-  for (const file of readdirSync(dir, { recursive: true }).filter((x) => x.endsWith('.js'))) {
+  for (const file of readdirSync(dir, { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((x) => x.endsWith('.js'))) {
     const src = readFileSync(new URL(file, dir), 'utf8').replace(/\/\/.*$/gm, '');
     for (const id of ids) assert.ok(!src.includes(`'${id}'`) && !src.includes(`"${id}"`), `${file} names ${id}`);
     // Nothing reads which fighter it is (a move's own id is fine).

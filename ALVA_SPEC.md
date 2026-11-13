@@ -58,6 +58,27 @@ behave, and how it must look.
   behave exactly as the repository does: its build validates it and its
   equivalence check compares its simulation with the source's step for step
   ([`docs/development/itch-release.md`](docs/development/itch-release.md)).
+- **The native apps** are that same release, wrapped, never forked: the
+  desktop apps for Windows, macOS and Linux in a Tauri window (`src-tauri/`)
+  and the Android app in a Capacitor WebView (`android/`), installed from
+  their own installers (no store), with the identifier
+  `io.github.hiyroscript.alva` and the name Alva. The shells are
+  development-only like the export (dev dependencies; never part of the
+  release), and the game asks only one module whether it runs in one
+  (`js/core/native-shell.js`): inside an app nothing offers to install
+  Alva, it counts as an installed app (its screen minimum, the landscape
+  lock without fullscreen), its links to other sites open in the player's
+  own browser, and on a computer F11 turns fullscreen on and off. Everything
+  else is identical, saved settings and progress included (kept by each
+  app's webview between launches). The Android app is landscape only and
+  asks for no permission but the network. iPhone is out of scope
+  ([`docs/development/native-apps.md`](docs/development/native-apps.md)).
+- **One version**, package.json's `version` (MAJOR.MINOR.PATCH), read by
+  every build: written into the release's bundle (`CONFIG.version`; the
+  modules run as they are, from the repository, are `dev`), the desktop
+  apps, the Android app (its versionName, and its versionCode MAJOR × 10000
+  + MINOR × 100 + PATCH, which only grows) and the room server's
+  `CURRENT_VERSION`. Online Play plays only on the current version (6.5c).
 - **Every URL is relative** (`./assets/...`, `./js/...`). Never use root-relative
   paths: the project page may live under `/alva/` (or the current repository
   name) and must work under any sub-path.
@@ -72,7 +93,8 @@ behave, and how it must look.
   cannot be reached, or no address, makes Online play unavailable, never
   broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one
-  the release may name besides the credits' links. Every other mode needs
+  the release may name besides the links the player opens (the credits'
+  and the Releases page). Every other mode needs
   no network at all. Matches go between the two browsers through a TURN
   relay, never straight from one to the other and never through the room
   server, so no player learns another's IP address (6.5c, Privacy).
@@ -1185,9 +1207,29 @@ neither player learns the other's address.
 - **The room server** caps itself to stay within Cloudflare's free plan:
   at most 50 rooms open at once and a daily request budget (refusing new
   rooms as "full" past 80% of the plan's day, while open rooms play on),
-  per-address limits, rooms cleaned up after 10 minutes without activity. It allows only itch.io's game hosts
-  (and a local copy for testing). No login, cookie or stored identity;
+  per-address limits, rooms cleaned up after 10 minutes without activity. It allows only itch.io's game hosts,
+  the native apps' own fixed addresses (2) and a local copy for testing. No login, cookie or stored identity;
   names last as long as their room (docs/development/online-server.md).
+- **The current version only.** Online play is for the newest release
+  (2, One version): the game sends its version with the reachability
+  check, the list, creating and joining, and the server
+  (`CURRENT_VERSION` in `server/wrangler.toml`) refuses any other, wherever
+  the game runs, itch.io's page and the native apps alike, with its own
+  message, then Home: "A new version of Alva is out. Update to play
+  online.", and how: in a native app, **Get the update** opens the
+  Releases page (every installer of the newest release) in the player's
+  browser, or **Not now**; in a browser, "Refresh this page to get it (or
+  download Alva again if you play a downloaded copy)." A room keeps its
+  host's version, so two versions never share one, and a room left from an
+  older release closes the same way. A copy run from the repository (`dev`)
+  plays only from a computer's own address. Everything offline plays on
+  whatever the version. A release deploys the server last, once its
+  installers can be downloaded.
+- **A copy that cannot link to another player** (no WebRTC: the Linux
+  desktop app, whose webview most distributions build without it) says so
+  after the name, before any room, then Home: "Online play needs a
+  connection this copy of Alva can't make. Play online in a web browser
+  instead."
 - **The relay's safeguards** keep Online play inside the relay's free
   monthly amount (Cloudflare's, 1,000 GB): at most 10 rooms with both
   players at once (a host waiting alone and the lobby do not count; one
@@ -1212,9 +1254,8 @@ neither player learns the other's address.
   now."), and a link that cannot be made says "Couldn't connect to your
   opponent. One of your networks may be blocking it.", with Try again. The
   server stores and logs no address (its per-minute limits count a salted
-  hash, in memory only; Cloudflare's per-request logs are off). A copy of
-  the game plays online as its version marked `+turn`, so it never shares a
-  room with an older copy. Each match measures the trip between the two
+  hash, in memory only; Cloudflare's per-request logs are off). Each match
+  measures the trip between the two
   players (the host's pings on the link) and plays inputs the fewest steps
   after they are sampled that cover it, 3 to 12 (50 to 200 ms; 50 ms for
   nearby players; 7 when nothing could be measured), the same on both

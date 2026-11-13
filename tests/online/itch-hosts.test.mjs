@@ -8,12 +8,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { EXTERNAL_URL, hostProblems, serverOrigins } from '../../tools/itch/hosts.mjs';
+import { hostProblems, serverOrigins, openedLinks } from '../../tools/itch/hosts.mjs';
 import { DEVELOPMENT_ONLY, isDevelopmentOnly, COPIED_FILES, COPIED_DIRS, pageParts, moduleOrder } from '../../tools/itch/release.mjs';
 import { CONFIG } from '../../js/config.js';
 
 const ROOT = new URL('../../', import.meta.url);
-const credits = new Set(readFileSync(new URL('js/ui/credits.js', ROOT), 'utf8').match(EXTERNAL_URL) ?? []);
+// The links the player opens: the credits' and the Releases page.
+const credits = openedLinks(readFileSync(new URL('js/ui/credits.js', ROOT), 'utf8'));
 const SERVER = 'https://alva-rooms.someone.workers.dev';
 
 test('with no server configured, only the credits\' links pass: every other host fails', () => {

@@ -18,6 +18,7 @@ export const ERRORS = Object.freeze({
   not_found: 404,
   room_full: 409,
   version_mismatch: 409,
+  outdated: 409,
   too_large: 413,
   rate_limited: 429,
   server_error: 500,

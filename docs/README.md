@@ -76,6 +76,10 @@ reads, what a fighter may leave out, and its tests.
 - [Running and deploying](development/setup.md)
 - [The itch.io release](development/itch-release.md): the optional export
   in fewer files, its validation and equivalence check, publishing it.
+- [The native apps](development/native-apps.md): Windows, macOS and Linux
+  (Tauri) and Android (Capacitor) around the itch.io release, building them,
+  signing, their origins, the version rule (online play on the current
+  version only) and how releases work.
 - [The room server](development/online-server.md): Online Play's Cloudflare
   Worker, its caps on the free plan, testing it locally, putting it online
   step by step.

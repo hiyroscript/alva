@@ -843,3 +843,131 @@ test('this hour\'s relay passwords all handed out: the link fails as "Servers ar
   await acknowledge(app);
   assert.equal(screens.room.retryButton.hidden, false);
 });
+
+// ---- The version rule --------------------------------------------------------------
+
+// A desktop app's page (js/core/native-shell.js), the opener's calls kept.
+function asDesktopApp() {
+  const opened = [];
+  globalThis.window.__TAURI_INTERNALS__ = {};
+  globalThis.window.__TAURI__ = { opener: { openUrl: async (url) => { opened.push(url); } } };
+  return { opened, done: () => { delete globalThis.window.__TAURI_INTERNALS__; delete globalThis.window.__TAURI__; } };
+}
+
+test('an outdated copy in a browser: "A new version of Alva is out", how to get it (reload), then Home; offline play is untouched', async () => {
+  const booted = boot({ version: '0.9.0' });
+  const { app, screens } = booted;
+  screens.home.actions.online.click();
+  screens.name.field.input.type_('Jules');
+  screens.name.continueButton.click();
+  await settleAll();
+  assert.equal(dialogText(app), 'New version available — A new version of Alva is out. Update to play online. ' +
+    'Refresh this page to get it (or download Alva again if you play a downloaded copy).');
+  assert.equal(app.dialog.cancelBtn.hidden, true, 'one button to acknowledge');
+  assert.equal(app.dialog.okBtn.textContent, 'Got it');
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+  assert.equal(screens.home.actions.play.disabled, false, 'everything offline still plays');
+  setLanguage('fr');
+  try {
+    screens.home.actions.online.click();
+    screens.name.continueButton.click();
+    await settleAll();
+    assert.equal(dialogText(app), 'Nouvelle version disponible — Une nouvelle version d’Alva est sortie. Mettez le jeu à jour pour jouer en ligne. ' +
+      'Rechargez cette page pour l’obtenir (ou téléchargez Alva à nouveau si vous jouez à une copie téléchargée).');
+    await acknowledge(app);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('an outdated copy in a native app: Get the update opens the Releases page in the player\'s browser; Not now goes Home', async () => {
+  const desktop = asDesktopApp();
+  try {
+    const booted = boot({ version: '0.9.0' });
+    const { app, screens } = booted;
+    screens.home.actions.online.click();
+    screens.name.field.input.type_('Jules');
+    screens.name.continueButton.click();
+    await settleAll();
+    assert.equal(dialogText(app), 'New version available — A new version of Alva is out. Update to play online.');
+    assert.equal(app.dialog.cancelBtn.hidden, false);
+    assert.deepEqual([app.dialog.okBtn.textContent, app.dialog.cancelBtn.textContent], ['Get the update', 'Not now']);
+    app.dialog.okBtn.click();
+    await settleAll();
+    assert.deepEqual(desktop.opened, ['https://github.com/hiyroscript/alva/releases/latest']);
+    assert.equal(current(app), 'home');
+    screens.home.actions.online.click();
+    screens.name.continueButton.click();
+    await settleAll();
+    app.dialog.cancelBtn.click();
+    await settleAll();
+    assert.equal(desktop.opened.length, 1, 'Not now opens nothing');
+    assert.equal(current(app), 'home');
+  } finally {
+    desktop.done();
+  }
+});
+
+test('the reachability check, the list, creating and joining all carry the game\'s version', async () => {
+  const server = backend();
+  const asked = [];
+  const fetchImpl = server.fetchImpl;
+  server.fetchImpl = async (url, init = {}) => {
+    asked.push(`${init.method ?? 'GET'} ${url.replace(/^https?:\/\/[^/]+/, '')}${init.body ? ` ${JSON.parse(init.body).version}` : ''}`);
+    return fetchImpl(url, init);
+  };
+  const booted = boot({ server });
+  await toLobby(booted);
+  await booted.app.online.diagnose();
+  booted.screens.lobby.createButton.click();
+  await settle();
+  booted.app.createRoomDialog.createButton.click();
+  await settleAll();
+  assert.ok(asked.includes('GET /rooms?version=1.0.0'), asked.join(', '));
+  assert.ok(asked.includes('GET /health?version=1.0.0'), asked.join(', '));
+  assert.ok(asked.includes('POST /rooms 1.0.0'), asked.join(', '));
+});
+
+test('\'dev\' (the modules run from the repository) plays only from a computer\'s own address', async () => {
+  const local = boot({ version: 'dev', server: backend({}, { origin: 'http://localhost:8000' }) });
+  await toLobby(local);
+  const itch = boot({ version: 'dev' });
+  itch.screens.home.actions.online.click();
+  itch.screens.name.field.input.type_('Jules');
+  itch.screens.name.continueButton.click();
+  await settleAll();
+  assert.match(dialogText(itch.app), /^New version available/);
+  await acknowledge(itch.app);
+  assert.equal(current(itch.app), 'home');
+});
+
+test('a release while a room is open: the room closes as outdated for both players, then Home', async () => {
+  const booted = boot();
+  const { app, server } = booted;
+  const guest = await roomWithGuest(booted);
+  // The release deploys the server last, with the new version; the old
+  // room closes at its next relay request (or reconnection).
+  server.env.CURRENT_VERSION = '1.0.1';
+  app.online.requestRelay().catch(() => {});
+  await settleAll(10);
+  assert.match(dialogText(app), /^New version available — A new version of Alva is out\./);
+  assert.ok(guest.events.some(([type, detail]) => type === 'closed' && detail.reason === 'outdated'), 'the other player is told too');
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+  assert.equal(app.online.inRoom, false);
+});
+
+test('a copy that cannot link to another player (no WebRTC, as in the Linux desktop app) says so before any room, then Home', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  app.online.peerFactory = Object.assign(() => null, { supported: () => false });
+  screens.home.actions.online.click();
+  screens.name.field.input.type_('Jules');
+  screens.name.continueButton.click();
+  await settleAll();
+  assert.equal(dialogText(app), "Online play unavailable — Online play needs a connection this copy of Alva can't make. Play online in a web browser instead.");
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+  assert.equal(booted.server.env.LOBBY.objects?.size ?? 0, 0, 'the server was never asked');
+});

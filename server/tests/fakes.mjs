@@ -6,8 +6,13 @@
 // sockets that record what they are sent, and namespaces that hand out one
 // object per name, wired to each other as in production.
 
+import { readFileSync } from 'node:fs';
 import { Lobby } from '../src/lobby.js';
 import { Room } from '../src/room.js';
+
+// The allowed origins as deployed (wrangler.toml): itch.io's game hosts,
+// the native apps and a local copy.
+const WRANGLER_ORIGINS = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8').match(/^ALLOWED_ORIGINS = "([^"]+)"/m)[1];
 
 const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
@@ -188,8 +193,9 @@ export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
   };
   const turn = fakeTurn();
   const env = {
-    ALLOWED_ORIGINS: 'https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*',
+    ALLOWED_ORIGINS: WRANGLER_ORIGINS,
     ONLINE_OPEN: 'true',
+    CURRENT_VERSION: VERSION,
     MAX_ROOMS: '50', DAILY_REQUEST_LIMIT: '100000', BUDGET_SHARE: '0.8', ROOM_IDLE_MINUTES: '10',
     MAX_MATCHES: '10', RELAY_GB_PER_HOUR: '0.2', RELAY_MONTHLY_GB: '450', RELAY_PASSWORDS_PER_HOUR: '120',
     CREATE_PER_MINUTE: '10', JOIN_PER_MINUTE: '30', LIST_PER_MINUTE: '120',
@@ -202,11 +208,15 @@ export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
 }
 
 export const ITCH = 'https://html-classic.itch.zone';
-export const VERSION = '0.1.0';
+// The release the server plays with (CURRENT_VERSION) and the games below
+// are.
+export const VERSION = '1.0.0';
 
 // A request to the Worker from the game (an allowed origin by default).
-export function gameRequest(path, { method = 'GET', body, origin = ITCH, ip = '203.0.113.7', headers = {} } = {}) {
-  return new Request(`https://alva-rooms.example.workers.dev${path}`, {
+// The list carries the game's `version` (?version=), as the game sends it.
+export function gameRequest(path, { method = 'GET', body, origin = ITCH, ip = '203.0.113.7', headers = {}, version = VERSION } = {}) {
+  const query = method === 'GET' && path === '/rooms' && version ? `?version=${encodeURIComponent(version)}` : '';
+  return new Request(`https://alva-rooms.example.workers.dev${path}${query}`, {
     method,
     headers: { ...(origin ? { origin } : {}), 'cf-connecting-ip': ip, ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,

@@ -67,6 +67,33 @@ export const validFighterId = (raw) => (typeof raw === 'string' && /^[\w-]{1,32}
 // The game's version string, or null.
 export const validVersion = (raw) => (typeof raw === 'string' && /^[\w.+-]{1,32}$/.test(raw) ? raw : null);
 
+// The version rule: Online play is for the current release only. Its
+// version is CURRENT_VERSION (wrangler.toml: package.json's, set by each
+// release), and a game of any other version is refused as `outdated` ("A
+// new version of Alva is out"), wherever it runs (itch.io's page and the
+// native apps alike). The game's modules run from the repository play as
+// DEV_VERSION, let in only from a computer's own address (LOCAL_ORIGIN:
+// http://localhost or http://127.0.0.1, any port), so testing on one's own
+// computer still plays while no real site can claim it. With no
+// CURRENT_VERSION at all, only 'dev' from there plays.
+export const DEV_VERSION = 'dev';
+const LOCAL_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/i;
+export const localOrigin = (origin) => typeof origin === 'string' && LOCAL_ORIGIN.test(origin);
+export const currentVersion = (env) => validVersion(String(env?.CURRENT_VERSION ?? '').trim());
+
+// Whether a game of `version`, from `origin` (its page's Origin), may play.
+export function versionAllowed(version, env, origin) {
+  if (version === DEV_VERSION) return localOrigin(origin);
+  const current = currentVersion(env);
+  return !!current && version === current;
+}
+
+// Whether a room of `version` (its host's) still plays: the current
+// version's, or 'dev' (made only from a computer's own address). A room of
+// an older version closes as `outdated` when a player connects or asks for
+// the relay, as a release replaces it.
+export const roomVersionCurrent = (version, env) => version === DEV_VERSION || (!!currentVersion(env) && version === currentVersion(env));
+
 // A match's input delay, in steps, as the host's browser chose it
 // (js/online/delay.js; the game's CONFIG.online.inputDelayRange, again).
 export const DELAY_RANGE = Object.freeze({ min: 3, max: 12 });

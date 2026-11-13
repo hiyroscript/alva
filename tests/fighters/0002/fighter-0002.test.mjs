@@ -11,6 +11,7 @@
 // anchor), the CPU playing them, and its touch buttons and names. The
 // roster, credits and translations it adds are checked in empty-roster,
 // settings and i18n. Layout and paint still need real-browser verification.
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -36,7 +37,7 @@ import { mulberry32 } from '../../../js/core/utils.js';
 import { mobileAbility, previewFrame } from '../../../js/ui/mobile-abilities.js';
 import { STRINGS, setLanguage } from '../../../js/localization/i18n.js';
 
-const ROOT = new URL('../../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const DIR = 'assets/characters/0002/';
 const DEF = getCharacter('0002');
 const DEF_0001 = getCharacter('0001');

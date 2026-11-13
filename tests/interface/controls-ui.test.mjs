@@ -196,7 +196,7 @@ test('the glyphs that stay are inline SVG in currentColor, hidden from assistive
   // fighters' own art now (see below), and nothing else drew them. So is the
   // retired Transform button's star.
   for (const gone of ['shuriken', 'punch', 'kick', 'spin', 'block', 'transform']) assert.equal(ICONS[gone], undefined, gone);
-  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => read(`js/${f}`)).join('\n');
+  const code = readdirSync(new URL('js/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js')).map((f) => read(`js/${f}`)).join('\n');
   assert.doesNotMatch(code, /ICONS\.(shuriken|punch|kick|spin)\b|icon: '(shuriken|punch|kick|spin)'/);
 });
 
@@ -307,7 +307,7 @@ test('#0001 authors its touch buttons as small, declarative UI data: a name and 
   // from attack data or file names.
   const code = (file) => read(file).replace(/\/\/.*$/gm, '');
   // (The touch controls that present it are UI: js/ui/touch-controls.js.)
-  for (const file of readdirSync(new URL('js/game/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js'))) {
+  for (const file of readdirSync(new URL('js/game/', ROOT), { recursive: true }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.js'))) {
     assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities/, `${file} never reads mobileAbilities`);
     if (file !== 'rendering/fighter-status.js') assert.doesNotMatch(code(`js/game/${file}`), /preview/, `${file}: presentation stays out of simulation`);
   }

@@ -71,13 +71,15 @@ export function readPack(text) {
 // What is development-only and never part of the release, wherever it
 // sits: the tests, documentation, tools, the room server (server/, a
 // Cloudflare Worker deployed on its own: docs/development/online-server.md),
-// npm, Git and editor files, source maps, Markdown and the repository's own
-// rule files. The build copies none of it, and the validation fails a
-// release holding any.
+// the native apps' shells (src-tauri/, android/ and capacitor.config.json,
+// which wrap this release: docs/development/native-apps.md), npm, Git and
+// editor files, source maps, Markdown and the repository's own rule files.
+// The build copies none of it, and the validation fails a release holding
+// any.
 export const DEVELOPMENT_ONLY = Object.freeze([
-  /(^|\/)(tests?|docs|tools|server|node_modules|dist|\.git|\.github|\.claude|\.wrangler)(\/|$)/,
+  /(^|\/)(tests?|docs|tools|server|src-tauri|android|node_modules|dist|\.git|\.github|\.claude|\.wrangler)(\/|$)/,
   /\.(map|mjs|md|log|zip|toml)$/i,
-  /(^|\/)(package(-lock)?\.json|\.nojekyll|\.gitignore|codename_rule|character_rule|max)$/,
+  /(^|\/)(package(-lock)?\.json|capacitor\.config\.json|\.nojekyll|\.gitignore|codename_rule|character_rule|max)$/,
   /\.test\./,
 ]);
 export const isDevelopmentOnly = (path) => DEVELOPMENT_ONLY.some((re) => re.test(path));
@@ -92,14 +94,51 @@ export const LIMITS = Object.freeze({
   pathLength: 240,
 });
 
+export const read = (path) => readFileSync(`${ROOT}${path}`, 'utf8');
+
+// The release's version: package.json's `version`, the one place it is
+// written (docs/development/native-apps.md). Every build reads it from
+// there: the bundle (releaseDefine below), the desktop apps
+// (src-tauri/tauri.conf.json), the Android app (android/app/build.gradle)
+// and the room server's CURRENT_VERSION (server/wrangler.toml, held to it
+// by a test). Three whole numbers, MAJOR.MINOR.PATCH, MINOR and PATCH
+// under 100, so the Android versionCode made from it always grows with it.
+export const VERSION_PATTERN = /^(0|[1-9]\d*)\.([1-9]?\d)\.([1-9]?\d)$/;
+
+export function releaseVersion(pkg = JSON.parse(read('package.json'))) {
+  const version = pkg?.version;
+  if (typeof version !== 'string' || !VERSION_PATTERN.test(version)) {
+    throw new Error(`package.json's version should be MAJOR.MINOR.PATCH (MINOR and PATCH under 100), not ${JSON.stringify(version)}`);
+  }
+  return version;
+}
+
+// Android's versionCode for `version` (android/app/build.gradle makes the
+// same): MAJOR × 10000 + MINOR × 100 + PATCH, so 1.0.0 is 10000 and 1.2.3
+// is 10203. A newer version always has a higher code, which Android needs
+// to install an update over the app.
+export function versionCode(version) {
+  const [, major, minor, patch] = String(version).match(VERSION_PATTERN) ?? [];
+  if (major === undefined) throw new Error(`not a release version: ${version}`);
+  return Number(major) * 10000 + Number(minor) * 100 + Number(patch);
+}
+
+// What the bundle has in place of the version global: CONFIG.version
+// (js/config.js) reads globalThis.ALVA_RELEASE_VERSION, which nothing
+// sets, so the modules as they are play as 'dev'; bundled, it is this
+// release's version, written in as a plain string. Nothing else changes.
+export const RELEASE_GLOBAL = 'globalThis.ALVA_RELEASE_VERSION';
+export const releaseDefine = (version = releaseVersion()) => Object.freeze({ [RELEASE_GLOBAL]: JSON.stringify(version) });
+
 // How js/ is bundled. Every option keeps the code as written: one ES
 // module (the page still loads it with type="module", so it is strict,
 // deferred and module-scoped as before), no syntax lowered (esnext), no
 // minification, no tree shaking (nothing dropped for looking unused: the
 // registries are read through their exports), no source map. esbuild only
-// joins the modules in their ES evaluation order and renames a top-level
-// name where two modules share it; no code reads a function's or class's
-// name, so a rename changes nothing (docs/development/itch-release.md).
+// joins the modules in their ES evaluation order, renames a top-level name
+// where two modules share it and writes the release's version in
+// (releaseDefine); no code reads a function's or class's name, so a
+// rename changes nothing (docs/development/itch-release.md).
 export const BUNDLE_OPTIONS = Object.freeze({
   bundle: true,
   format: 'esm',
@@ -112,9 +151,8 @@ export const BUNDLE_OPTIONS = Object.freeze({
   legalComments: 'inline',
   logLevel: 'silent',
   write: false,
+  define: releaseDefine(),
 });
-
-export const read = (path) => readFileSync(`${ROOT}${path}`, 'utf8');
 
 // The stylesheet parts index.html links, in its (cascade) order, and its
 // module entry: the release joins exactly what the page loads, so a part

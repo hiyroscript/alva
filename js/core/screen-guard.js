@@ -23,6 +23,8 @@
 // to exist (main.js starts it before the App). Its button is focused while
 // it shows, keeps focus inside it, and answers Enter / Space and a
 // controller's Cross / A (polled here, so it works even with no App).
+// Inside a native app (js/core/native-shell.js) Alva is installed already:
+// the block has no Download Alva, and its panel holds the focus instead.
 //
 // Listeners (onChange) hear each change of `blocked`: the App pauses an
 // offline match and stops all game input while blocked (an online match
@@ -33,6 +35,7 @@ import { CONFIG } from '../config.js';
 import { el } from './utils.js';
 import { tx, setText, onLanguageChange, localizeTree } from '../localization/i18n.js';
 import { INSTALL_INSTRUCTIONS, runningInstalled } from './web-app-install.js';
+import { isNativeApp } from './native-shell.js';
 
 // The visible area in CSS pixels, { width, height }.
 export function viewportSize(win = globalThis.window) {
@@ -91,12 +94,17 @@ export class ScreenGuard {
     this.title = el('h1', { class: 'screen-block-title', id: 'screen-block-title', ...tx('screenBlock.title') });
     this.body = el('p', { class: 'screen-block-body', id: 'screen-block-body', ...tx('screenBlock.body') });
     this.rotate = el('p', { class: 'screen-block-rotate', hidden: true, ...tx('screenBlock.rotate') });
-    this.download = el('button', { class: 'btn btn--primary screen-block-download', type: 'button', ...tx('screenBlock.download') });
+    this.native = isNativeApp(this.win);
+    this.download = el('button', {
+      class: 'btn btn--primary screen-block-download', type: 'button', hidden: this.native, ...tx('screenBlock.download'),
+    });
     this.status = el('p', { class: 'screen-block-status', role: 'status', 'aria-live': 'polite', hidden: true });
     this.stepsHeading = el('h2', { class: 'screen-block-steps-title' });
     this.stepsBody = el('div', { class: 'screen-block-steps-body' });
     this.steps = el('section', { class: 'screen-block-steps', hidden: true }, [this.stepsHeading, this.stepsBody]);
-    this.panel = el('div', { class: 'screen-block-panel' }, [this.title, this.body, this.rotate, this.download, this.status, this.steps]);
+    this.panel = el('div', { class: 'screen-block-panel', tabindex: this.native ? '-1' : null }, [
+      this.title, this.body, this.rotate, this.download, this.status, this.steps,
+    ]);
     this.root = el('div', {
       class: 'screen-block', id: 'screen-block', role: 'alertdialog', 'aria-modal': 'true',
       'aria-labelledby': 'screen-block-title', 'aria-describedby': 'screen-block-body', hidden: true,
@@ -167,7 +175,7 @@ export class ScreenGuard {
   }
 
   focusButton() {
-    this.download.focus?.({ preventScroll: true });
+    (this.native ? this.panel : this.download).focus?.({ preventScroll: true });
   }
 
   // ---- Download Alva ---------------------------------------------------------------
@@ -224,9 +232,10 @@ export class ScreenGuard {
 
   // ---- Controller -------------------------------------------------------------------
 
-  // Cross / A on any controller presses the button while the block shows.
+  // Cross / A on any controller presses the button while the block shows
+  // (in a native app there is none to press).
   watchPad() {
-    if (this.padFrame !== null || typeof this.win?.requestAnimationFrame !== 'function') return;
+    if (this.native || this.padFrame !== null || typeof this.win?.requestAnimationFrame !== 'function') return;
     this.padHeld = true; // a press already down when it appeared is not one
     const tick = () => {
       this.padFrame = null;

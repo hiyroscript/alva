@@ -6,6 +6,7 @@
 // ground move's and its mid-air version's count together), and only those
 // it threw itself count. #0015's Gift and Air Gift (one present at a time)
 // are its first users; their own behaviour is checked in fighter-0015.
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ import {
 import { cooldownClass, ROUTINE_EFFECTS } from '../../js/data/cooldowns.js';
 import { getCharacter } from '../../js/data/characters.js';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ANIM = { frames: [{}], fps: 10, loop: true, sourceFacing: 0 };
 
 // A thrower with the projectiles `specs` (id -> spec), releasing nothing yet.

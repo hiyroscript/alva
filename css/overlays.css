@@ -259,6 +259,7 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 .screen-block-status { opacity: 0.85; }
 .screen-block-status[hidden], .screen-block-rotate[hidden], .screen-block-steps[hidden] { display: none; }
 .screen-block-download { min-width: 200px; }
+.screen-block-download[hidden] { display: none; }
 .screen-block-download:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .screen-block-steps { display: grid; gap: 6px; text-align: left; font-size: 14px; line-height: 1.5; }
 .screen-block-steps-title { margin: 0; font-size: 15px; font-weight: 700; color: #fff; }
